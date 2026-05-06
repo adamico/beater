@@ -1,0 +1,3 @@
+[submodule "dragonruby-yard-doc"]
+	path = dragonruby-yard-doc
+	url = https://github.com/owenbutler/dragonruby-yard-doc.git
