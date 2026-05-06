@@ -3,12 +3,12 @@
 # ==============================================
 
 # === Remove the pound sign and leading space for the properties below before publishing your game. ===
-# devid=your_itchio_username
-# devtitle=Your Itch.io Display Name
-# gameid=your_itchio_game_id
-# gametitle=Your Game Title
-# version=0.1
-# icon=metadata/icon.png
+devid=kc00l
+devtitle=Fifth Layer Studio
+gameid=beat2r
+gametitle=Beat2R
+version=0.1.0
+icon=metadata/icon.png
 
 # ==============================================
 # === Flags available at all licensing tiers ===
