@@ -26,7 +26,7 @@ orientation=landscape
 # | - 1: linear, less blocky visuals
 # | - 2: anisotropic/best, higher computational overhead than linear, but provides the best visual quality
 # +=====================================
-scale_quality=2
+scale_quality=0
 
 # +== HD Mode ===
 # | HD Mode: Set hd=false for low rez games
@@ -137,7 +137,7 @@ hd=true
 # hd_max_scale=175
 
 # 1440p: scales up to 2560x1440
-# hd_max_scale=200
+hd_max_scale=200
 
 # 1800p: scales up to 3200x1800
 # hd_max_scale=250
