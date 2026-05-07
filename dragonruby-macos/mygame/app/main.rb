@@ -7,21 +7,17 @@ require 'data/maps/pacman_layout.rb'
 class Game
   attr_dr
 
-  pacman_layout = MapLayouts::PACMAN_LAYOUT
-
   GRID_WIDTH = 28
   GRID_HEIGHT = 36
   CELL_SIZE = 20
   OFFSET_X = CELL_SIZE * 16
   OFFSET_Y = CELL_SIZE * 2
-  MAP_FILE = 'data/maps/pacman.gmm'
 
   def initialize
     puts "Game initializing..."
-    map = GmmParser.parse(MAP_FILE)
-    puts "Map loaded: #{!map.nil?} (W: #{map&.[](:width)}, H: #{map&.[](:height)}, Floors: #{map&.[](:floors)&.length})"
-    grid_w = map ? map[:width] : GRID_WIDTH
-    grid_h = map ? map[:height] : GRID_HEIGHT
+    layout = MapLayouts::PACMAN_LAYOUT
+    grid_w = layout[0][0].length
+    grid_h = layout.length
 
     # generate available spaces that the player can move through
     @cells = grid_w.flat_map do |x_ordinal|
@@ -41,16 +37,14 @@ class Game
 
     # track which spaces have walls in them
     @walls = []
-    if map
-      @cells.each do |cell|
-        gmm_y = grid_h - 1 - cell[:y_ordinal]
-        gmm_x = cell[:x_ordinal]
-        index = gmm_y * (map[:width] + 1) + gmm_x
-        tile = map[:floors][index]
-        
-        # floors (1) are walkable cells, all other tiles are walls
-        @walls << cell if tile != 1
-      end
+    @cells.each do |cell|
+      gmm_y = grid_h - 1 - cell[:y_ordinal]
+      gmm_x = cell[:x_ordinal]
+      char = layout[gmm_y][0][gmm_x]
+      
+      # floors (.) are walkable cells, all other tiles are walls
+      cell[:char] = char
+      @walls << cell if char != "."
     end
 
     # player's position, size, and movement direction
@@ -69,14 +63,6 @@ class Game
   end
 
   def tick
-    # Render debug info
-    outputs.labels << { x: 10, y: 710, text: "Press 'R' to reload map. Walls: #{@walls.length}", r: 255, g: 255, b: 255 }
-
-    if inputs.keyboard.key_down.r
-      puts "Reloading Game map..."
-      initialize
-    end
-
     # move player based on arrow key input, but only if the player won't collide with a wall
     if inputs.up_down != 0
       # first check cells to see if the player is grid aligned
