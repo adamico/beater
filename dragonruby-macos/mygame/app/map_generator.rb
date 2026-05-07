@@ -67,26 +67,26 @@ module MapGenerator
           bl = y < grid_h - 1 && x > 0 && lines[y+1][x-1] == "w"
           br = y < grid_h - 1 && x < grid_w - 1 && lines[y+1][x+1] == "w"
           
-          if !t && !l
+          if b && r && !br
             line += "1"
-          elsif !t && !r
+          elsif b && l && !bl
             line += "2"
-          elsif !b && !l
+          elsif t && r && !tr
             line += "3"
-          elsif !b && !r
+          elsif t && l && !tl
+            line += "4"
+          elsif !t && !l && b && r
+            line += "1"
+          elsif !t && !r && b && l
+            line += "2"
+          elsif !b && !l && t && r
+            line += "3"
+          elsif !b && !r && t && l
             line += "4"
           elsif !t || !b
             line += "h"
           elsif !l || !r
             line += "v"
-          elsif !tl
-            line += "4"
-          elsif !tr
-            line += "3"
-          elsif !bl
-            line += "2"
-          elsif !br
-            line += "1"
           else
             line += "w"
           end

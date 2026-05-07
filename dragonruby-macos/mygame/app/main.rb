@@ -108,14 +108,47 @@ class Game
 
     # render the game
     outputs.background_color = [30, 30, 30]
-    outputs.primitives << @walls.map do |cell|
-      {
-        x: cell[:x] + 2,
-        y: cell[:y] + 2,
-        w: cell[:w] - 4,
-        h: cell[:h] - 4,
-        path: :solid, r: 255, g: 255, b: 255, a: 128
-      }
+    outputs.lines << @walls.flat_map do |cell|
+      cx = cell[:x] + cell[:w] / 2
+      cy = cell[:y] + cell[:h] / 2
+      top_y = cell[:y] + cell[:h]
+      bottom_y = cell[:y]
+      left_x = cell[:x]
+      right_x = cell[:x] + cell[:w]
+      color = { r: 255, g: 255, b: 255 }
+      
+      case cell[:char]
+      when "1"
+        [
+          { x: cx, y: bottom_y, x2: cx, y2: cy, **color },
+          { x: cx, y: cy, x2: right_x, y2: cy, **color }
+        ]
+      when "2"
+        [
+          { x: cx, y: bottom_y, x2: cx, y2: cy, **color },
+          { x: cx, y: cy, x2: left_x, y2: cy, **color }
+        ]
+      when "3"
+        [
+          { x: cx, y: top_y, x2: cx, y2: cy, **color },
+          { x: cx, y: cy, x2: right_x, y2: cy, **color }
+        ]
+      when "4"
+        [
+          { x: cx, y: top_y, x2: cx, y2: cy, **color },
+          { x: cx, y: cy, x2: left_x, y2: cy, **color }
+        ]
+      when "v"
+        [
+          { x: cx, y: top_y, x2: cx, y2: bottom_y, **color }
+        ]
+      when "h"
+        [
+          { x: left_x, y: cy, x2: right_x, y2: cy, **color }
+        ]
+      else
+        []
+      end
     end
     outputs.primitives << @player
   end
