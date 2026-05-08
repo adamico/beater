@@ -1,5 +1,9 @@
 require 'app/gmm_parser.rb'
 require 'app/map_generator.rb'
+require 'app/tiles.rb'
+require 'app/grid_projection.rb'
+require 'app/maze.rb'
+require 'app/pellets.rb'
 
 MapGenerator.generate_if_needed('data/maps/pacman.gmm', 'data/maps/pacman_layout.rb')
 require 'data/maps/pacman_layout.rb'
@@ -7,150 +11,93 @@ require 'data/maps/pacman_layout.rb'
 class Game
   attr_dr
 
-  GRID_WIDTH = 28
-  GRID_HEIGHT = 36
   CELL_SIZE = 20
   OFFSET_X = CELL_SIZE * 16
   OFFSET_Y = CELL_SIZE * 2
+  PLAYER_SPAWN = [3, 7].freeze
+  PLAYER_SPEED = 2
+
+  WALL_COLOR   = { r: 255, g: 255, b: 255 }.freeze
+  PELLET_COLOR = { r: 255, g: 200, b: 150 }.freeze
 
   def initialize
-    puts "Game initializing..."
-    layout = MapLayouts::PACMAN_LAYOUT
-    grid_w = layout[0][0].length
-    grid_h = layout.length
+    @projection = GridProjection.new(cell_size: CELL_SIZE, offset_x: OFFSET_X, offset_y: OFFSET_Y)
+    @maze = Maze.from_layout(MapLayouts::PACMAN_LAYOUT)
+    @pellets = Pellets.from_maze(@maze)
 
-    # generate available spaces that the player can move through
-    @cells = grid_w.flat_map do |x_ordinal|
-      grid_h.map do |y_ordinal|
-        {
-          **Geometry.rect(
-            x: x_ordinal * CELL_SIZE + OFFSET_X,
-            y: y_ordinal * CELL_SIZE + OFFSET_Y,
-            w: CELL_SIZE,
-            h: CELL_SIZE
-          ),
-          x_ordinal: x_ordinal,
-          y_ordinal: y_ordinal
-        }
-      end
-    end
-
-    # track which spaces have walls in them
-    @walls = []
-    @cells.each do |cell|
-      gmm_y = grid_h - 1 - cell[:y_ordinal]
-      gmm_x = cell[:x_ordinal]
-      char = layout[gmm_y][0][gmm_x]
-      
-      # floors (.) are walkable cells, all other tiles are walls
-      cell[:char] = char
-      @walls << cell if char != "."
-    end
-
-    # player's position, size, and movement direction
+    spawn = @projection.cell_rect(*PLAYER_SPAWN)
     @player = {
-      x: (CELL_SIZE / 2)*3 + OFFSET_X,
-      y: (CELL_SIZE / 2)*7 + OFFSET_Y,
-      w: CELL_SIZE,
-      h: CELL_SIZE,
-      dx: 1,
-      dy: 0,
-      anchor_x: 0.5,
-      anchor_y: 0.5,
+      x: spawn[:x], y: spawn[:y],
+      w: CELL_SIZE, h: CELL_SIZE,
+      dx: 1, dy: 0,
       path: :solid,
-      r: 128, g: 255, b: 128,
+      r: 128, g: 255, b: 128
     }
   end
 
   def tick
-    # move player based on arrow key input, but only if the player won't collide with a wall
-    if inputs.up_down != 0
-      # first check cells to see if the player is grid aligned
-      collisions = Geometry.find_all_intersect_rect(
-        { **@player, y: @player.y + inputs.up_down },
-        @cells,
-        tolerance: 0
-      )
+    handle_input
+    move_player
+    eat_pellets
+    render
+  end
 
-      # if the player is intersecting with exactly 2 cells, then they are grid aligned and we can check for wall collisions
-      if collisions.length == 2
-        # if neither of the cells the player is intersecting with have walls, then we can move the player
-        if collisions.none? { |collision| @walls.include?(collision) }
-          # update the player's movement direction based on the input
-          @player.dy = inputs.up_down
-          @player.dx = 0
-        end
+  def handle_input
+    if inputs.up_down != 0
+      probe = { **@player, y: @player.y + inputs.up_down }
+      if can_turn_to?(probe)
+        @player.dy = inputs.up_down
+        @player.dx = 0
       end
     elsif inputs.left_right != 0
-      collisions = Geometry.find_all_intersect_rect(
-        { **@player, x: @player.x + inputs.left_right },
-        @cells,
-        tolerance: 0
-      )
-
-      if collisions.length == 2
-        if collisions.none? { |collision| @walls.include?(collision) }
-          @player.dy = 0
-          @player.dx = inputs.left_right
-        end
+      probe = { **@player, x: @player.x + inputs.left_right }
+      if can_turn_to?(probe)
+        @player.dy = 0
+        @player.dx = inputs.left_right
       end
     end
+  end
 
-    # move the player based on their movement direction, but only if they won't collide with a wall
-    @player.x += @player.dx * 2
-    if Geometry.find_intersect_rect(@player, @walls)
-      @player.x -= @player.dx * 2
-    end
-    @player.y += @player.dy * 2
-    if Geometry.find_intersect_rect(@player, @walls)
-      @player.y -= @player.dy * 2
-    end
+  def can_turn_to?(rect)
+    cells = @projection.cells_touched(rect)
+    return false unless cells.length == 2
+    cells.all? { |gx, gy| @maze.walkable?(gx, gy) }
+  end
 
-    # render the game
+  def move_player
+    @player.x += @player.dx * PLAYER_SPEED
+    @player.x -= @player.dx * PLAYER_SPEED if blocked?(@player)
+    @player.y += @player.dy * PLAYER_SPEED
+    @player.y -= @player.dy * PLAYER_SPEED if blocked?(@player)
+  end
+
+  def blocked?(rect)
+    @projection.cells_touched(rect).any? { |gx, gy| !@maze.walkable?(gx, gy) }
+  end
+
+  def eat_pellets
+    @projection.cells_touched(@player).each do |gx, gy|
+      @pellets.eat(gx, gy) if @pellets.at(gx, gy)
+    end
+  end
+
+  def render
     outputs.background_color = [30, 30, 30]
-    outputs.lines << @walls.flat_map do |cell|
-      cx = cell[:x] + cell[:w] / 2
-      cy = cell[:y] + cell[:h] / 2
-      top_y = cell[:y] + cell[:h]
-      bottom_y = cell[:y]
-      left_x = cell[:x]
-      right_x = cell[:x] + cell[:w]
-      color = { r: 255, g: 255, b: 255 }
-      
-      case cell[:char]
-      when "1"
-        [
-          { x: cx, y: bottom_y, x2: cx, y2: cy, **color },
-          { x: cx, y: cy, x2: right_x, y2: cy, **color }
-        ]
-      when "2"
-        [
-          { x: cx, y: bottom_y, x2: cx, y2: cy, **color },
-          { x: cx, y: cy, x2: left_x, y2: cy, **color }
-        ]
-      when "3"
-        [
-          { x: cx, y: top_y, x2: cx, y2: cy, **color },
-          { x: cx, y: cy, x2: right_x, y2: cy, **color }
-        ]
-      when "4"
-        [
-          { x: cx, y: top_y, x2: cx, y2: cy, **color },
-          { x: cx, y: cy, x2: left_x, y2: cy, **color }
-        ]
-      when "v"
-        [
-          { x: cx, y: top_y, x2: cx, y2: bottom_y, **color }
-        ]
-      when "h"
-        [
-          { x: left_x, y: cy, x2: right_x, y2: cy, **color }
-        ]
-      else
-        []
-      end
-    end
+    outputs.lines << @maze.wall_segments(@projection).map { |seg| { **seg, **WALL_COLOR } }
+    outputs.solids << pellet_solids
     outputs.primitives << @player
+  end
+
+  def pellet_solids
+    solids = []
+    @pellets.each do |coords, kind|
+      gx, gy = coords
+      r = @projection.cell_rect(gx, gy)
+      size = kind == :power ? 8 : 4
+      pad = (CELL_SIZE - size) / 2
+      solids << { x: r[:x] + pad, y: r[:y] + pad, w: size, h: size, **PELLET_COLOR }
+    end
+    solids
   end
 end
 
