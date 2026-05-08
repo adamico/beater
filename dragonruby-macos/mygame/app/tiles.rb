@@ -1,20 +1,12 @@
 # app/tiles.rb
 #
-# Runtime source of truth for the layout char alphabet. See CONTEXT.md for the
-# glossary. All readers (Maze, Pellets, MapGenerator) reference these constants
-# rather than string literals.
+# Runtime source of truth for walkable-tile chars. See CONTEXT.md for the
+# glossary. Wall chars live in WallShape.
 
 module Tiles
-  PELLET        = "."
-  POWER_PELLET  = "o"
-  EMPTY         = "_"
-  WALL_INTERIOR = "w"
-  WALL_H        = "h"
-  WALL_V        = "v"
-  CORNER_BR     = "1"
-  CORNER_BL     = "2"
-  CORNER_TR     = "3"
-  CORNER_TL     = "4"
+  PELLET       = "."
+  POWER_PELLET = "o"
+  EMPTY        = "_"
 
   WALKABLE = [PELLET, POWER_PELLET, EMPTY].freeze
 

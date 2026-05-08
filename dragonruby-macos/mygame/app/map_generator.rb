@@ -1,5 +1,6 @@
 # app/map_generator.rb
 require 'app/gmm_parser.rb'
+require 'app/wall_shape.rb'
 
 module MapGenerator
   def self.generate_if_needed(gmm_path, rb_path)
@@ -57,39 +58,17 @@ module MapGenerator
         if lines[y][x] == "."
           line += "."
         else
-          t = y > 0 && lines[y-1][x] == "w"
-          b = y < grid_h - 1 && lines[y+1][x] == "w"
-          l = x > 0 && lines[y][x-1] == "w"
-          r = x < grid_w - 1 && lines[y][x+1] == "w"
-          
-          tl = y > 0 && x > 0 && lines[y-1][x-1] == "w"
-          tr = y > 0 && x < grid_w - 1 && lines[y-1][x+1] == "w"
-          bl = y < grid_h - 1 && x > 0 && lines[y+1][x-1] == "w"
-          br = y < grid_h - 1 && x < grid_w - 1 && lines[y+1][x+1] == "w"
-          
-          if b && r && !br
-            line += "1"
-          elsif b && l && !bl
-            line += "2"
-          elsif t && r && !tr
-            line += "3"
-          elsif t && l && !tl
-            line += "4"
-          elsif !t && !l && b && r
-            line += "1"
-          elsif !t && !r && b && l
-            line += "2"
-          elsif !b && !l && t && r
-            line += "3"
-          elsif !b && !r && t && l
-            line += "4"
-          elsif !t || !b
-            line += "h"
-          elsif !l || !r
-            line += "v"
-          else
-            line += "w"
-          end
+          shape = WallShape.classify(
+            t:  y > 0           && lines[y-1][x] == "w",
+            b:  y < grid_h - 1  && lines[y+1][x] == "w",
+            l:  x > 0           && lines[y][x-1] == "w",
+            r:  x < grid_w - 1  && lines[y][x+1] == "w",
+            tl: y > 0           && x > 0          && lines[y-1][x-1] == "w",
+            tr: y > 0           && x < grid_w - 1 && lines[y-1][x+1] == "w",
+            bl: y < grid_h - 1  && x > 0          && lines[y+1][x-1] == "w",
+            br: y < grid_h - 1  && x < grid_w - 1 && lines[y+1][x+1] == "w"
+          )
+          line += shape.char
         end
       end
       out_lines << line
