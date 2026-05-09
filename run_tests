@@ -1,0 +1,13 @@
+#!/bin/sh
+cd "`dirname "$0"`"
+cd dragonruby-macos
+
+status=0
+for file in mygame/tests/*_tests.rb; do
+  echo "=== $file ==="
+  if ! ./dragonruby mygame --test "$file"; then
+    status=1
+  fi
+done
+
+exit $status
