@@ -2,6 +2,11 @@ require 'app/tiles.rb'
 require 'app/grid_projection.rb'
 require 'app/maze.rb'
 require 'app/pellets.rb'
+require 'app/direction.rb'
+require 'app/grid_mover.rb'
+require 'app/keyboard_controller.rb'
+require 'app/player.rb'
+require 'app/world.rb'
 
 class Game
   attr_dr
@@ -21,57 +26,26 @@ class Game
     @pellets = Pellets.from_maze(@maze)
 
     spawn = @projection.cell_rect(*PLAYER_SPAWN)
-    @player = {
+    @player = Player.new(
       x: spawn[:x], y: spawn[:y],
       w: CELL_SIZE, h: CELL_SIZE,
-      dx: 1, dy: 0,
-      path: :solid,
-      r: 128, g: 255, b: 128
-    }
+      speed: PLAYER_SPEED,
+      controller: KeyboardController.new,
+      direction: Direction::RIGHT
+    )
   end
 
   def tick
-    handle_input
-    move_player
+    world = World.new(inputs: inputs, maze: @maze, projection: @projection, player: @player, pellets: @pellets)
+    intent = @player.controller.next_direction(world)
+    @player.try_turn(intent, @maze, @projection)
+    @player.advance(@maze, @projection)
     eat_pellets
     render
   end
 
-  def handle_input
-    if inputs.up_down != 0
-      probe = { **@player, y: @player.y + inputs.up_down }
-      if can_turn_to?(probe)
-        @player.dy = inputs.up_down
-        @player.dx = 0
-      end
-    elsif inputs.left_right != 0
-      probe = { **@player, x: @player.x + inputs.left_right }
-      if can_turn_to?(probe)
-        @player.dy = 0
-        @player.dx = inputs.left_right
-      end
-    end
-  end
-
-  def can_turn_to?(rect)
-    cells = @projection.cells_touched(rect)
-    return false unless cells.length == 2
-    cells.all? { |gx, gy| @maze.walkable?(gx, gy) }
-  end
-
-  def move_player
-    @player.x += @player.dx * PLAYER_SPEED
-    @player.x -= @player.dx * PLAYER_SPEED if blocked?(@player)
-    @player.y += @player.dy * PLAYER_SPEED
-    @player.y -= @player.dy * PLAYER_SPEED if blocked?(@player)
-  end
-
-  def blocked?(rect)
-    @projection.cells_touched(rect).any? { |gx, gy| !@maze.walkable?(gx, gy) }
-  end
-
   def eat_pellets
-    @projection.cells_touched(@player).each do |gx, gy|
+    @projection.cells_touched(@player.rect).each do |gx, gy|
       @pellets.eat(gx, gy) if @pellets.at(gx, gy)
     end
   end
@@ -80,7 +54,7 @@ class Game
     outputs.background_color = [30, 30, 30]
     outputs.lines << @maze.wall_segments(@projection).map { |seg| { **seg, **WALL_COLOR } }
     outputs.solids << pellet_solids
-    outputs.primitives << @player
+    outputs.solids << @player
   end
 
   def pellet_solids

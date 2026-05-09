@@ -34,5 +34,9 @@ Reserved (not yet emitted by `MapGenerator`, planned):
 - **Maze** — topology. `walkable?(gx, gy)`, `wall_segments(projection)`. Pure-grid; swallows the layout→world y-flip at construction.
 - **GridProjection** — pixel↔ordinal geometry. `cell_rect(gx, gy)`, `cells_touched(rect)`, `aligned?(rect)`. Holds `cell_size` + offsets.
 - **Pellets** — consumable state. `at(gx, gy)`, `eat(gx, gy)`, `remaining`. Reads same layout as Maze.
+- **Direction** — value object: `Direction::UP/DOWN/LEFT/RIGHT/NONE`, each with `.dx`, `.dy`, `.opposite`. Replaces ad-hoc symbols and dx/dy pairs across actor code.
+- **GridMover** — mixin providing grid-aligned movement. Holds `x, y, w, h, dx, dy, speed` state and `try_turn(direction, maze, projection)` / `advance(maze, projection)` methods. Player and Ghost both `include GridMover`.
+- **Controller** — strategy object that decides an actor's next direction. `Controller#next_direction(world) -> Direction`. `KeyboardController` reads `world.inputs` for the player; ghost controllers (chase/scatter/frightened) come later. Pure function of `world`; mode swap is `actor.controller = NewController.new`.
+- **World** — per-tick bag passed to controllers (`inputs`, `maze`, `projection`, `player`, `pellets`). Built by Game each tick; private to the actor/controller pipeline.
 
 Agents (Player, future Enemy) consult **Maze** (semantics) + **GridProjection** (geometry).
