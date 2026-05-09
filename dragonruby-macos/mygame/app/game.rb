@@ -54,7 +54,7 @@ class Game
     outputs.background_color = [30, 30, 30]
     outputs.lines << @maze.wall_segments(@projection).map { |seg| { **seg, **WALL_COLOR } }
     outputs.solids << pellet_solids
-    outputs.solids << @player
+    outputs.solids << @player.to_solid
   end
 
   def pellet_solids

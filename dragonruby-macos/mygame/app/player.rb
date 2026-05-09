@@ -16,7 +16,7 @@ class Player
     @a = 255
   end
 
-  def primitive_marker
-    :solid
+  def to_solid
+    { x: @x, y: @y, w: @w, h: @h, r: @r, g: @g, b: @b, a: @a }
   end
 end
