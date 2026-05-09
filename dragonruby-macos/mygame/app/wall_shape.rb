@@ -52,16 +52,4 @@ class WallShape
   def self.from_char(ch)
     BY_CHAR[ch]
   end
-
-  def self.classify(t:, b:, l:, r:, tl:, tr:, bl:, br:)
-    return CORNER_BR if (b && r && !br) || (!t && !l && b && r)
-    return CORNER_BL if (b && l && !bl) || (!t && !r && b && l)
-    return CORNER_TR if (t && r && !tr) || (!b && !l && t && r)
-    return CORNER_TL if (t && l && !tl) || (!b && !r && t && l)
-    # `!t || !b` (vs `!t`) catches T-junctions whose t/b differ; without it
-    # they would fall through to INTERIOR. Same for WALL_V on l/r.
-    return WALL_H    if !t || !b
-    return WALL_V    if !l || !r
-    INTERIOR
-  end
 end

@@ -30,7 +30,7 @@ Reserved (not yet emitted by `MapGenerator`, planned):
 ## Modules
 
 - **Tiles** — walkable-tile char alphabet (`.`, `o`, `_`) + `walkable?(ch)`.
-- **WallShape** — wall-tile vocabulary. Owns wall chars (`1234hvw`), char↔shape (`from_char`, `.char`), neighbor-mask classification (`classify(t:, b:, l:, r:, tl:, tr:, bl:, br:)`), and pixel-rect geometry (`.segments(rect)`). Single edit-site for adding wall shapes.
+- **WallShape** — wall-tile vocabulary. Owns wall chars (`1234hvw`), char↔shape (`from_char`, `.char`), and pixel-rect geometry (`.segments(rect)`). Single edit-site for adding wall shapes.
 - **Maze** — topology. `walkable?(gx, gy)`, `wrap(gx, gy)`, `wall_segments(projection)`. Pure-grid; swallows the layout→world y-flip at construction. Toroidal on X: `walkable?` wraps `gx` so out-of-bounds horizontal coords resolve across the seam (Y stays strict).
 - **GridProjection** — pixel↔ordinal geometry. `cell_rect(gx, gy)`, `cells_touched(rect)`, `aligned?(rect)`, `playfield_rect`. Holds `cell_size`, offsets, and grid extents.
 - **Pellets** — consumable state. `at(gx, gy)`, `eat(gx, gy)`, `remaining`. Reads same layout as Maze.
