@@ -8,6 +8,7 @@ require 'app/keyboard_controller.rb'
 require 'app/player.rb'
 require 'app/world.rb'
 require 'app/renderer.rb'
+require 'data/maps/pacman_layout.rb'
 
 class Game
   attr_dr

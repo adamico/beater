@@ -1,4 +1,3 @@
-require 'data/maps/pacman_layout.rb'
 require 'app/game.rb'
 
 def tick args
