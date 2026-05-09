@@ -16,12 +16,15 @@ class Game
   CELL_SIZE = 20
   OFFSET_X = CELL_SIZE * 16
   OFFSET_Y = CELL_SIZE * 2
-  PLAYER_SPAWN = [3, 7].freeze
+  PLAYER_SPAWN = [4, 8].freeze
   PLAYER_SPEED = 2
 
   def initialize
-    @projection = GridProjection.new(cell_size: CELL_SIZE, offset_x: OFFSET_X, offset_y: OFFSET_Y)
     @maze = Maze.from_layout(MapLayouts::PACMAN_LAYOUT)
+    @projection = GridProjection.new(
+      cell_size: CELL_SIZE, offset_x: OFFSET_X, offset_y: OFFSET_Y,
+      grid_w: @maze.width, grid_h: @maze.height
+    )
     @pellets = Pellets.from_maze(@maze)
     @renderer = Renderer.new(@projection)
 

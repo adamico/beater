@@ -61,6 +61,19 @@ module GridMover
     @x -= @dx * @speed if blocked_by_wall?(maze, projection)
     @y += @dy * @speed
     @y -= @dy * @speed if blocked_by_wall?(maze, projection)
+
+    wrap_pixel_position(projection)
+  end
+
+  # Tunnel teleport: once the rect has fully exited the playfield horizontally,
+  # snap to the opposite edge. Maze#walkable? wraps grid coords already, so the
+  # actor walks across the seam without rollback; this only repositions pixels.
+  def wrap_pixel_position(projection)
+    pf = projection.playfield_w
+    left = projection.offset_x
+    right = left + pf
+    @x += pf if @x + @w <= left
+    @x -= pf if @x >= right
   end
 
   def rect

@@ -27,7 +27,7 @@ end
 
 def fresh_world
   maze = Maze.from_layout(TEST_LAYOUT_5X5)
-  projection = GridProjection.new(cell_size: 20, offset_x: 0, offset_y: 0)
+  projection = GridProjection.new(cell_size: 20, offset_x: 0, offset_y: 0, grid_w: 5, grid_h: 5)
   [maze, projection]
 end
 
@@ -103,6 +103,46 @@ def test_advance_in_open_corridor args, assert
   actor.advance(maze, projection)
   assert.equal! actor.x, 40
   assert.equal! actor.y, 42
+end
+
+TUNNEL_LAYOUT_5X5 = [
+  %w(wwwww),
+  %w(w...w),
+  %w(_..._),
+  %w(w...w),
+  %w(wwwww)
+]
+
+def tunnel_world
+  maze = Maze.from_layout(TUNNEL_LAYOUT_5X5)
+  projection = GridProjection.new(cell_size: 20, offset_x: 0, offset_y: 0, grid_w: 5, grid_h: 5)
+  [maze, projection]
+end
+
+def test_advance_into_tunnel_does_not_rollback args, assert
+  maze, projection = tunnel_world
+  # Tunnel row is gy=2. Aligned at left edge (gx=0). Step LEFT by 2 leaves rect
+  # at x=-2 (still mostly inside playfield); walkable? wraps so no rollback.
+  actor = TestActor.new(x: 0, y: 40, w: 20, h: 20, speed: 2, direction: Direction::LEFT)
+  actor.advance(maze, projection)
+  assert.equal! actor.x, -2
+end
+
+def test_advance_wraps_after_fully_exiting args, assert
+  maze, projection = tunnel_world
+  # Actor is one step away from being fully off-screen on the left.
+  # x=-18 + step LEFT by 2 -> x=-20, x+w=0 -> teleport to x = -20 + 100 = 80.
+  actor = TestActor.new(x: -18, y: 40, w: 20, h: 20, speed: 2, direction: Direction::LEFT)
+  actor.advance(maze, projection)
+  assert.equal! actor.x, 80
+end
+
+def test_advance_wraps_after_exiting_right args, assert
+  maze, projection = tunnel_world
+  # playfield_w = 100. Actor at x=98 + step RIGHT by 2 -> x=100 -> teleport to 0.
+  actor = TestActor.new(x: 98, y: 40, w: 20, h: 20, speed: 2, direction: Direction::RIGHT)
+  actor.advance(maze, projection)
+  assert.equal! actor.x, 0
 end
 
 def test_advance_into_wall_rolls_back args, assert

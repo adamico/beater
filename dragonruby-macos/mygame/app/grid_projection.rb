@@ -1,12 +1,14 @@
 # app/grid_projection.rb
 
 class GridProjection
-  attr_reader :cell_size, :offset_x, :offset_y
+  attr_reader :cell_size, :offset_x, :offset_y, :grid_w, :grid_h
 
-  def initialize(cell_size:, offset_x:, offset_y:)
+  def initialize(cell_size:, offset_x:, offset_y:, grid_w:, grid_h:)
     @cell_size = cell_size
     @offset_x = offset_x
     @offset_y = offset_y
+    @grid_w = grid_w
+    @grid_h = grid_h
   end
 
   def cell_rect(gx, gy)
@@ -35,5 +37,17 @@ class GridProjection
 
   def aligned?(rect)
     cells_touched(rect).length == 2
+  end
+
+  def playfield_w
+    @cell_size * @grid_w
+  end
+
+  def playfield_h
+    @cell_size * @grid_h
+  end
+
+  def playfield_rect
+    { x: @offset_x, y: @offset_y, w: playfield_w, h: playfield_h }
   end
 end

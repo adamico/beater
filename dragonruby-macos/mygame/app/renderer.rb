@@ -40,6 +40,15 @@ class Renderer
   end
 
   def draw_player(outputs, player)
+    return if outside_playfield?(player.rect)
     outputs.solids << player.to_solid
+  end
+
+  def outside_playfield?(rect)
+    pf = @projection.playfield_rect
+    rect[:x] + rect[:w] <= pf[:x] ||
+      rect[:x] >= pf[:x] + pf[:w] ||
+      rect[:y] + rect[:h] <= pf[:y] ||
+      rect[:y] >= pf[:y] + pf[:h]
   end
 end
