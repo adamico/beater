@@ -38,5 +38,6 @@ Reserved (not yet emitted by `MapGenerator`, planned):
 - **GridMover** — mixin providing grid-aligned movement. Holds `x, y, w, h, dx, dy, speed` state and `try_turn(direction, maze, projection)` / `advance(maze, projection)` methods. Player and Ghost both `include GridMover`.
 - **Controller** — strategy object that decides an actor's next direction. `Controller#next_direction(world) -> Direction`. `KeyboardController` reads `world.inputs` for the player; ghost controllers (chase/scatter/frightened) come later. Pure function of `world`; mode swap is `actor.controller = NewController.new`.
 - **World** — per-tick bag passed to controllers (`inputs`, `maze`, `projection`, `player`, `pellets`). Built by Game each tick; private to the actor/controller pipeline.
+- **Renderer** — owns all drawing. `draw(outputs, maze, pellets, player)` pushes primitives into DR's outputs each tick. Holds the projection; stateless w.r.t. outputs. Theme constants (colors, pellet sizes) live here.
 
 Agents (Player, future Enemy) consult **Maze** (semantics) + **GridProjection** (geometry).
