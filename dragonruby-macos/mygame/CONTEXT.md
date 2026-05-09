@@ -25,16 +25,14 @@ Reserved (not yet emitted by `MapGenerator`, planned):
 | `P`  | Player spawn   | Replaces hardcoded `PLAYER_SPAWN`  |
 | `G`  | Ghost spawn    | Multiple per layout                |
 
-`MapGenerator` currently emits only `.` for walkable cells. `o` / `_` are authored
-manually in `*_layout.rb` until generator support lands.
+`pacman_layout.rb` is the source of truth for the map and is hand-authored.
 
 ## Modules
 
 - **Tiles** — walkable-tile char alphabet (`.`, `o`, `_`) + `walkable?(ch)`.
 - **WallShape** — wall-tile vocabulary. Owns wall chars (`1234hvw`), char↔shape (`from_char`, `.char`), neighbor-mask classification (`classify(t:, b:, l:, r:, tl:, tr:, bl:, br:)`), and pixel-rect geometry (`.segments(rect)`). Single edit-site for adding wall shapes.
-- **Maze** — topology. `walkable?(gx, gy)`, `wall_segments(projection)`. Pure-grid; swallows the GMM→world y-flip at construction.
+- **Maze** — topology. `walkable?(gx, gy)`, `wall_segments(projection)`. Pure-grid; swallows the layout→world y-flip at construction.
 - **GridProjection** — pixel↔ordinal geometry. `cell_rect(gx, gy)`, `cells_touched(rect)`, `aligned?(rect)`. Holds `cell_size` + offsets.
 - **Pellets** — consumable state. `at(gx, gy)`, `eat(gx, gy)`, `remaining`. Reads same layout as Maze.
-- **MapGenerator** — compiles `.gmm` → `*_layout.rb` (only when stale). Delegates wall classification to `WallShape.classify`.
 
 Agents (Player, future Enemy) consult **Maze** (semantics) + **GridProjection** (geometry).
