@@ -39,6 +39,20 @@ class Maze
     [gx % @width, gy]
   end
 
+  # Cell bounds (inclusive) of the visible play area: the maze minus its
+  # wrap-seam edges. Derived from `wrap` so it stays consistent if wrap
+  # behavior changes (e.g. adding a vertical tunnel).
+  def visible_cell_bounds
+    x_wraps = wrap(-1, 0)[0] != -1
+    y_wraps = wrap(0, -1)[1] != -1
+    {
+      gx0: x_wraps ? 1 : 0,
+      gy0: y_wraps ? 1 : 0,
+      gx1: x_wraps ? @width - 2 : @width - 1,
+      gy1: y_wraps ? @height - 2 : @height - 1
+    }
+  end
+
   def char_at(gx, gy)
     return nil if gx < 0 || gy < 0 || gx >= @width || gy >= @height
     @chars[gy][gx]

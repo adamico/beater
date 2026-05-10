@@ -19,4 +19,8 @@ class Player
   def to_solid
     { x: @x, y: @y, w: @w, h: @h, r: @r, g: @g, b: @b, a: @a }
   end
+
+  def to_sprite
+    { x: @x, y: @y, w: @w, h: @h, path: "sprites/square/blue.png" }
+  end
 end

@@ -6,9 +6,10 @@
 # ordinals to pixel rects.
 
 class Renderer
-  BACKGROUND   = [30, 30, 30].freeze
-  WALL_COLOR   = { r: 255, g: 255, b: 255 }.freeze
-  PELLET_COLOR = { r: 255, g: 200, b: 150 }.freeze
+  BACKGROUND      = [30, 30, 30].freeze
+  WALL_COLOR      = { r: 255, g: 255, b: 255 }.freeze
+  PELLET_COLOR    = { r: 255, g: 200, b: 150 }.freeze
+  CLIP_BACKGROUND = [0, 0, 0, 0].freeze
 
   PELLET_SIZE       = 4
   POWER_PELLET_SIZE = 8
@@ -21,7 +22,7 @@ class Renderer
     outputs.background_color = BACKGROUND
     draw_walls(outputs, maze)
     draw_pellets(outputs, pellets)
-    draw_player(outputs, player)
+    draw_player(outputs, maze, player)
   end
 
   def draw_walls(outputs, maze)
@@ -34,21 +35,33 @@ class Renderer
       rect = @projection.cell_rect(gx, gy)
       size = kind == :power ? POWER_PELLET_SIZE : PELLET_SIZE
       pad = (@projection.cell_size - size) / 2
-      solids << { x: rect[:x] + pad, y: rect[:y] + pad, w: size, h: size, **PELLET_COLOR }
+      solids << {
+        x: rect[:x] + pad, y: rect[:y] + pad,
+        w: size, h: size, **PELLET_COLOR
+      }
     end
     outputs.solids << solids
   end
 
-  def draw_player(outputs, player)
-    return if outside_playfield?(player.rect)
-    outputs.solids << player.to_solid
-  end
+  # Render the player into an off-screen target sized to the visible play
+  # area, then blit. The clip hides the sprite as it crosses the wrap seam
+  # so it doesn't peek out of the wrap-edge columns.
+  def draw_player(outputs, maze, player)
+    visible = @projection.rect_for_cell_bounds(maze.visible_cell_bounds)
+    sprite = player.to_sprite
 
-  def outside_playfield?(rect)
-    pf = @projection.playfield_rect
-    rect[:x] + rect[:w] <= pf[:x] ||
-      rect[:x] >= pf[:x] + pf[:w] ||
-      rect[:y] + rect[:h] <= pf[:y] ||
-      rect[:y] >= pf[:y] + pf[:h]
+    outputs[:clipped_area].background_color = CLIP_BACKGROUND
+    outputs[:clipped_area].w = visible[:w]
+    outputs[:clipped_area].h = visible[:h]
+    outputs[:clipped_area].sprites << sprite.merge(
+      x: sprite[:x] - visible[:x],
+      y: sprite[:y] - visible[:y]
+    )
+
+    outputs.sprites << {
+      x: visible[:x], y: visible[:y],
+      w: visible[:w], h: visible[:h],
+      path: :clipped_area
+    }
   end
 end

@@ -50,4 +50,13 @@ class GridProjection
   def playfield_rect
     { x: @offset_x, y: @offset_y, w: playfield_w, h: playfield_h }
   end
+
+  def rect_for_cell_bounds(b)
+    {
+      x: b[:gx0] * @cell_size + @offset_x,
+      y: b[:gy0] * @cell_size + @offset_y,
+      w: (b[:gx1] - b[:gx0] + 1) * @cell_size,
+      h: (b[:gy1] - b[:gy0] + 1) * @cell_size
+    }
+  end
 end
