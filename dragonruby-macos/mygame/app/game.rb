@@ -208,6 +208,7 @@ class Game
   def tick_frightened
     return if @frightened_ticks <= 0
     @frightened_ticks -= 1
+    @ghosts.each { |g| g.frightened_remaining_ticks = @frightened_ticks if g.state == :frightened }
     return if @frightened_ticks > 0
     mode = current_phase_mode
     @ghosts.each do |g|
@@ -270,6 +271,7 @@ class Game
       g.state = :frightened
       g.controller = GhostControllers::Frightened.new
       g.speed = GHOST_FRIGHTENED_SPEED
+      g.frightened_remaining_ticks = FRIGHTENED_DURATION_TICKS
       g.face(g.direction.opposite) unless g.direction.none?
     end
   end
