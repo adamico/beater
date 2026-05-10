@@ -4,7 +4,6 @@
 
 - Top down 2D
 - collectible sprites (diamond)
-- power pellets sprites (bigger circles)
 - Palette (look in lospec.com) for a low color count palette (4 colors + black and white) with neon tones
 
 ## Audio
@@ -13,6 +12,9 @@
 
 ## Gameplay
 
+- tweak actors speed (frightened and eaten ghosts)
+- bonus score collectables (not vanilla pacman?)
+  
 ## UI
 
 - Title screen (with title, background, credits, social, play button)
@@ -25,7 +27,7 @@
 
 ## Gameplay
 
-- bonus score collectables (not vanilla pacman?)
+
 - different maps
 - different tracks
 - mechanics:
