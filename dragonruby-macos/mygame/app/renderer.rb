@@ -9,6 +9,7 @@ class Renderer
   BACKGROUND      = [30, 30, 30].freeze
   WALL_COLOR      = { r: 255, g: 255, b: 255 }.freeze
   PELLET_COLOR    = { r: 255, g: 200, b: 150 }.freeze
+  POPUP_COLOR     = { r: 100, g: 220, b: 255 }.freeze
   CLIP_BACKGROUND = [0, 0, 0, 0].freeze
 
   PELLET_SIZE       = 4
@@ -18,11 +19,23 @@ class Renderer
     @projection = projection
   end
 
-  def draw(outputs, maze, pellets, player, ghosts = [])
+  def draw(outputs, maze, pellets, player, ghosts = [], popup: nil)
     outputs.background_color = BACKGROUND
     draw_walls(outputs, maze)
     draw_pellets(outputs, pellets)
     draw_actors(outputs, maze, player, ghosts)
+    draw_popup(outputs, popup) if popup
+  end
+
+  def draw_popup(outputs, popup)
+    outputs.labels << {
+      x: popup[:x], y: popup[:y],
+      text: popup[:text],
+      size_enum: 4,
+      alignment_enum: 1,
+      vertical_alignment_enum: 1,
+      **POPUP_COLOR
+    }
   end
 
   def draw_walls(outputs, maze)

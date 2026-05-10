@@ -14,7 +14,7 @@ class Ghost
     inky:   "sprites/square/blue.png",
     clyde:  "sprites/square/orange.png",
     frightened: "sprites/square/white.png",
-    eaten:      "sprites/square/empty.png"
+    eaten:      "sprites/hexagon/black.png"
   }.freeze
 
   attr_accessor :state, :controller

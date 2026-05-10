@@ -45,6 +45,7 @@ class Game
   RELEASE_STALL_TICKS = 4 * 60
 
   EAT_POINTS = [200, 400, 800, 1600].freeze
+  EAT_PAUSE_TICKS = 60 # 1s arcade-style freeze on eat
 
   SPAWN_MARKER_TO_IDENTITY = {
     Tiles::SPAWN_BLINKY => :blinky,
@@ -70,6 +71,8 @@ class Game
     @frightened_ticks = 0
     @eat_chain = 0
     @score = 0
+    @eat_pause_ticks = 0
+    @eat_popup = nil
     initialize_player
     initialize_ghosts
   end
@@ -144,6 +147,13 @@ class Game
   end
 
   def tick
+    if @eat_pause_ticks > 0
+      @eat_pause_ticks -= 1
+      @eat_popup = nil if @eat_pause_ticks == 0
+      @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, popup: @eat_popup)
+      return
+    end
+
     tick_phase
     tick_frightened
     tick_releases
@@ -160,7 +170,7 @@ class Game
     tick_player(world)
     tick_ghosts(world)
     tick_collisions
-    @renderer.draw(outputs, @maze, @pellets, @player, @ghosts)
+    @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, popup: @eat_popup)
   end
 
   def tick_phase
@@ -197,6 +207,7 @@ class Game
         g.state = mode
         g.controller = GhostControllers.for(g.identity)
         g.speed = g.base_speed
+        snap_to_cell(g)
       end
     end
     @eat_chain = 0
@@ -302,12 +313,16 @@ class Game
   end
 
   def eat_ghost(ghost)
-    @score += EAT_POINTS[[@eat_chain, EAT_POINTS.size - 1].min]
+    points = EAT_POINTS[[@eat_chain, EAT_POINTS.size - 1].min]
+    @score += points
     @eat_chain += 1
     ghost.state = :eaten
     ghost.role = Tiles::ROLE_GHOST_EATEN
     ghost.controller = GhostControllers::Eaten.new
     ghost.speed = ghost.base_speed
+    snap_to_cell(ghost)
+    @eat_pause_ticks = EAT_PAUSE_TICKS
+    @eat_popup = { x: ghost.x + ghost.w / 2, y: ghost.y + ghost.h / 2, text: points.to_s }
   end
 
   def player_dies
@@ -328,6 +343,16 @@ class Game
     @frightened_ticks = 0
     @eat_chain = 0
     @ticks_since_release = 0
+  end
+
+  # Frightened ghosts run at odd speed (1) so their pixel position can fall
+  # off the integer-cell-aligned grid. When transitioning to a state whose
+  # speed is even, that drift would prevent at_cell_center? from ever firing
+  # again, freezing all turning decisions. Snap on entry to fix.
+  def snap_to_cell(ghost)
+    cs = @projection.cell_size
+    ghost.x = ((ghost.x - @projection.offset_x) / cs).round * cs + @projection.offset_x
+    ghost.y = ((ghost.y - @projection.offset_y) / cs).round * cs + @projection.offset_y
   end
 
   def any_frightened?

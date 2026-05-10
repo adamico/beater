@@ -125,9 +125,41 @@ module GhostControllers
     end
   end
 
+  # BFS-based shortest-path targeting. Used by Eaten + LeavingHouse where
+  # correctness matters (greedy Euclidean breaks across tunnel wrap and dead-
+  # end corridors). Chase/scatter stay greedy on purpose — that's the arcade
+  # behavior and what gives each ghost its character.
+  module BFSTargeting
+    def self.next_direction(ghost, world, target_cell)
+      return Direction::NONE unless ghost.at_cell_center?(world.projection)
+      start = ghost.grid_cell(world.projection)
+      return Direction::NONE if start == target_cell
+
+      visited = { start => nil }
+      queue = [start]
+      until queue.empty?
+        cell = queue.shift
+        Direction::ALL_MOVING.each do |d|
+          nx, ny = world.maze.wrap(cell[0] + d.dx, cell[1] + d.dy)
+          next_cell = [nx, ny]
+          next if visited.key?(next_cell)
+          next unless world.maze.walkable?(nx, ny, role: ghost.role)
+          visited[next_cell] = [cell, d]
+          if next_cell == target_cell
+            current = next_cell
+            current = visited[current][0] while visited[current][0] != start
+            return visited[current][1]
+          end
+          queue << next_cell
+        end
+      end
+      Direction::NONE
+    end
+  end
+
   class Eaten
     def next_direction(world, ghost)
-      Targeting.next_direction(ghost, world, ghost.spawn_cell)
+      BFSTargeting.next_direction(ghost, world, ghost.spawn_cell)
     end
   end
 
@@ -139,7 +171,7 @@ module GhostControllers
     end
 
     def next_direction(world, ghost)
-      Targeting.next_direction(ghost, world, @target)
+      BFSTargeting.next_direction(ghost, world, @target)
     end
   end
 end
