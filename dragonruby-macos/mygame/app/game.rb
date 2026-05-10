@@ -39,7 +39,13 @@ class Game
   end
 
   def tick
-    world = World.new(inputs: inputs, maze: @maze, projection: @projection, player: @player, pellets: @pellets)
+    world = World.new(
+      inputs: inputs,
+      maze: @maze,
+      projection: @projection,
+      player: @player,
+      pellets: @pellets
+    )
     intent = @player.controller.next_direction(world)
     @player.try_turn(intent, @maze, @projection)
     @player.advance(@maze, @projection)
