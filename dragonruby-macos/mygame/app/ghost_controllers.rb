@@ -130,4 +130,16 @@ module GhostControllers
       Targeting.next_direction(ghost, world, ghost.spawn_cell)
     end
   end
+
+  # Targets a fixed exit cell with the ghost's current role (:ghost_leaving).
+  # Path through the door + pen corridor is opened by the role's passability.
+  class LeavingHouse
+    def initialize(target_cell)
+      @target = target_cell
+    end
+
+    def next_direction(world, ghost)
+      Targeting.next_direction(ghost, world, @target)
+    end
+  end
 end

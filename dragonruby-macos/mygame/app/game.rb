@@ -25,8 +25,6 @@ class Game
   GHOST_FRIGHTENED_SPEED = 1
   FRIGHTENED_DURATION_TICKS = 600 # 10s @ 60fps
 
-  # Arcade-style scatter/chase phase table (level 1), in ticks @ 60fps.
-  # Last phase :chase has nil duration = stay in chase forever.
   PHASE_TABLE = [
     [:scatter,  7 * 60],
     [:chase,   20 * 60],
@@ -38,7 +36,6 @@ class Game
     [:chase,   nil]
   ].freeze
 
-  # Per-ghost dot threshold to leave the house (level 1).
   RELEASE_DOT_THRESHOLD = {
     blinky: 0,
     pinky:  0,
@@ -49,6 +46,13 @@ class Game
 
   EAT_POINTS = [200, 400, 800, 1600].freeze
 
+  SPAWN_MARKER_TO_IDENTITY = {
+    Tiles::SPAWN_BLINKY => :blinky,
+    Tiles::SPAWN_PINKY  => :pinky,
+    Tiles::SPAWN_INKY   => :inky,
+    Tiles::SPAWN_CLYDE  => :clyde
+  }.freeze
+
   def initialize
     @maze = Maze.from_layout(MapLayouts::PACMAN_LAYOUT)
     @projection = GridProjection.new(
@@ -57,6 +61,8 @@ class Game
     )
     @pellets = Pellets.from_maze(@maze)
     @renderer = Renderer.new(@projection)
+    @spawn_cells = scan_spawn_cells
+    @above_door_cell = @spawn_cells[:blinky]
     @dot_count = 0
     @ticks_since_release = 0
     @phase_index = 0
@@ -79,8 +85,22 @@ class Game
     )
   end
 
+  # Each ghost identity has one or more spawn marker chars in the layout.
+  # Use the leftmost (smallest gx) for ghosts with multiple markers — that
+  # is the anchor of the 2-tile-wide sprite quad.
+  def scan_spawn_cells
+    cells = {}
+    @maze.each_cell do |gx, gy, ch|
+      id = SPAWN_MARKER_TO_IDENTITY[ch]
+      next unless id
+      if cells[id].nil? || gx < cells[id][0]
+        cells[id] = [gx, gy]
+      end
+    end
+    cells
+  end
+
   def initialize_ghosts
-    spawns = ghost_spawn_cells
     bounds = @maze.visible_cell_bounds
     scatter_targets = {
       blinky: [bounds[:gx1], bounds[:gy1]],
@@ -89,8 +109,8 @@ class Game
       clyde:  [bounds[:gx0], bounds[:gy0]]
     }
 
-    @ghosts = Ghost::IDENTITIES.each_with_index.map do |id, i|
-      cell = spawns[i] || spawns.last
+    @ghosts = Ghost::IDENTITIES.map do |id|
+      cell = @spawn_cells[id]
       rect = @projection.cell_rect(*cell)
       Ghost.new(
         identity: id,
@@ -103,23 +123,24 @@ class Game
         direction: Direction::LEFT
       )
     end
-    @released = { blinky: true, pinky: false, inky: false, clyde: false }
+    reset_ghost_states
   end
 
-  # Pick 4 spawn cells: prefer EMPTY (`_`) cells far from the player; fall back
-  # to any walkable cell if too few. Single anchor cell `G` is not yet emitted
-  # by the layout, so we scan instead. TODO: switch to G-anchored offsets.
-  def ghost_spawn_cells
-    empties = []
-    walkables = []
-    @maze.each_cell do |gx, gy, ch|
-      empties << [gx, gy] if ch == Tiles::EMPTY
-      walkables << [gx, gy] if Tiles.walkable?(ch)
+  def reset_ghost_states
+    @released = { blinky: true, pinky: false, inky: false, clyde: false }
+    @ghosts.each do |g|
+      if g.identity == :blinky
+        g.state = current_phase_mode
+        g.role = Tiles::ROLE_DEFAULT
+        g.controller = GhostControllers.for(g.identity)
+      else
+        g.state = :in_house
+        g.role = Tiles::ROLE_DEFAULT
+        g.controller = nil
+      end
+      g.face(Direction::LEFT)
+      g.speed = g.base_speed
     end
-    cells = empties.size >= 4 ? empties : walkables
-
-    px, py = PLAYER_SPAWN
-    cells.sort_by { |(gx, gy)| -((gx - px)**2 + (gy - py)**2) }.first(4)
   end
 
   def tick
@@ -160,8 +181,7 @@ class Game
   def apply_phase_to_ghosts
     mode = current_phase_mode
     @ghosts.each do |g|
-      next if g.state == :frightened || g.state == :eaten
-      next unless @released[g.identity]
+      next unless g.state == :scatter || g.state == :chase
       g.state = mode
       g.face(g.direction.opposite) unless g.direction.none?
     end
@@ -171,7 +191,6 @@ class Game
     return if @frightened_ticks <= 0
     @frightened_ticks -= 1
     return if @frightened_ticks > 0
-    # Frightened expired: restore active ghosts to current phase mode.
     mode = current_phase_mode
     @ghosts.each do |g|
       if g.state == :frightened
@@ -192,10 +211,17 @@ class Game
         @released[id] = true
         @ticks_since_release = 0
         ghost = @ghosts.find { |g| g.identity == id }
-        ghost.state = current_phase_mode if ghost && ghost.state != :frightened && ghost.state != :eaten
+        start_leaving_house(ghost) if ghost && ghost.state == :in_house
         break
       end
     end
+  end
+
+  def start_leaving_house(ghost)
+    ghost.state = :leaving_house
+    ghost.role = Tiles::ROLE_GHOST_LEAVING
+    ghost.controller = GhostControllers::LeavingHouse.new(@above_door_cell)
+    ghost.face(Direction::UP)
   end
 
   def tick_player(world)
@@ -221,8 +247,7 @@ class Game
     @frightened_ticks = FRIGHTENED_DURATION_TICKS
     @eat_chain = 0
     @ghosts.each do |g|
-      next if g.state == :eaten
-      next unless @released[g.identity]
+      next unless g.state == :scatter || g.state == :chase
       g.state = :frightened
       g.controller = GhostControllers::Frightened.new
       g.speed = GHOST_FRIGHTENED_SPEED
@@ -232,35 +257,43 @@ class Game
 
   def tick_ghosts(world)
     @ghosts.each do |g|
-      next unless @released[g.identity]
-      if g.state == :eaten && reached_spawn?(g)
-        respawn_eaten(g)
-      end
+      next if g.state == :in_house
+
+      handle_ghost_state_transitions(g)
+      next unless g.controller
+
       intent = g.controller.next_direction(world, g)
       g.try_turn(intent, @maze, @projection) unless intent.none?
       g.advance(@maze, @projection)
     end
   end
 
-  def reached_spawn?(ghost)
-    return false unless ghost.at_cell_center?(@projection)
-    ghost.grid_cell(@projection) == ghost.spawn_cell
-  end
+  def handle_ghost_state_transitions(ghost)
+    return unless ghost.at_cell_center?(@projection)
+    cell = ghost.grid_cell(@projection)
 
-  def respawn_eaten(ghost)
-    ghost.state = current_phase_mode
-    ghost.controller = GhostControllers.for(ghost.identity)
-    ghost.speed = ghost.base_speed
+    case ghost.state
+    when :eaten
+      if cell == ghost.spawn_cell
+        # Reached home — flip to leaving so it walks back out the door.
+        start_leaving_house(ghost)
+      end
+    when :leaving_house
+      if cell == @above_door_cell
+        ghost.state = current_phase_mode
+        ghost.role = Tiles::ROLE_DEFAULT
+        ghost.controller = GhostControllers.for(ghost.identity)
+        ghost.speed = ghost.base_speed
+      end
+    end
   end
 
   def tick_collisions
     @ghosts.each do |g|
+      next if g.state == :in_house || g.state == :eaten
       next unless rects_overlap?(@player.rect, g.rect)
-      case g.state
-      when :frightened
+      if g.state == :frightened
         eat_ghost(g)
-      when :eaten
-        # eyes — no interaction
       else
         player_dies
         return
@@ -272,6 +305,7 @@ class Game
     @score += EAT_POINTS[[@eat_chain, EAT_POINTS.size - 1].min]
     @eat_chain += 1
     ghost.state = :eaten
+    ghost.role = Tiles::ROLE_GHOST_EATEN
     ghost.controller = GhostControllers::Eaten.new
     ghost.speed = ghost.base_speed
   end
@@ -282,18 +316,13 @@ class Game
     @player.y = spawn[:y]
     @player.face(Direction::RIGHT)
 
-    spawns = ghost_spawn_cells
-    @ghosts.each_with_index do |g, i|
-      cell = spawns[i] || spawns.last
+    @ghosts.each do |g|
+      cell = @spawn_cells[g.identity]
       rect = @projection.cell_rect(*cell)
       g.x = rect[:x]
       g.y = rect[:y]
-      g.face(Direction::LEFT)
-      g.state = :scatter
-      g.controller = GhostControllers.for(g.identity)
-      g.speed = g.base_speed
     end
-    @released = { blinky: true, pinky: false, inky: false, clyde: false }
+    reset_ghost_states
     @phase_index = 0
     @phase_ticks = 0
     @frightened_ticks = 0

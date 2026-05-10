@@ -34,12 +34,15 @@ class Ghost
     @base_speed
   end
 
+  # Sprite is 2 tiles wide and tall (arcade-faithful 2x2 quad). The actor's
+  # logical rect (collision/movement) stays 1 cell; only the sprite is doubled.
+  # Anchor = bottom-left of the 2x2 quad in world coords (screen Y-up).
   def to_sprite
     path = case @state
            when :frightened then SPRITES[:frightened]
            when :eaten      then SPRITES[:eaten]
            else SPRITES[@identity]
            end
-    { x: @x, y: @y, w: @w, h: @h, path: path }
+    { x: @x, y: @y, w: @w * 2, h: @h * 2, path: path }
   end
 end
