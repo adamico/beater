@@ -79,7 +79,7 @@ module GridMover
   def rect
     { x: @x, y: @y, w: @w, h: @h }
   end
-
+  
   def face(direction)
     @direction = direction
     @dx = direction.dx
