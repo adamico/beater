@@ -3,29 +3,15 @@
 ## Visuals
 
 - Top down 2D
-- Player sprite (simple circle)
-- Ghost sprites (simple circles)
-- Dot sprites (simple circles)
+- collectible sprites (diamond)
+- power pellets sprites (bigger circles)
 - Palette (look in lospec.com) for a low color count palette (4 colors + black and white) with neon tones
 
 ## Audio
 
-- Use a js library for synced audio playback like tone.js
-- Use littlejs zzsfxr to generate sound effects
-- Use littlejs zzsfm to generate music
-- Have 3-4 versions of the same track with different levels of completeness
-- or have muted notes based on player progress
+- Use builtin audio manager (see tools/audio_manager.rb)
 
 ## Gameplay
-
-- use builtin littlejs world grid
-- maze drawn in code using the grid
-- Player is a simple shape in yellow/white
-- Player movement in a gridlocked 4 axis without stopping (copy pacman)
-- Simple AABB collision detection
-- Dots and power pellets are code based circles, dots are white, power pellets are larger and white
-- Enemies are a different shape than player, in 4 colors (copy pacman)
-- Enemies use pacman AI
 
 ## UI
 
