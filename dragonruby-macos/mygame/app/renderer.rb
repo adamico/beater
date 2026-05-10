@@ -13,7 +13,7 @@ class Renderer
   CLIP_BACKGROUND = [0, 0, 0, 0].freeze
 
   PELLET_SIZE       = 4
-  POWER_PELLET_SIZE = 8
+  POWER_PELLET_SIZE = 16
 
   def initialize(projection)
     @projection = projection
