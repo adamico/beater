@@ -157,7 +157,8 @@ class Game
     if @eat_pause_ticks > 0
       @eat_pause_ticks -= 1
       @eat_popup = nil if @eat_pause_ticks == 0
-      @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, popup: @eat_popup)
+      visible_ghosts = @ghosts.reject { |g| g.state == :eaten }
+      @renderer.draw(outputs, @maze, @pellets, nil, visible_ghosts, popup: @eat_popup)
       return
     end
 

@@ -61,7 +61,9 @@ class Renderer
   def draw_actors(outputs, maze, player, ghosts)
     visible = @projection.rect_for_cell_bounds(maze.visible_cell_bounds)
 
-    sprites = [player.to_sprite] + ghosts.map(&:to_sprite)
+    sprites = []
+    sprites << player.to_sprite if player
+    sprites.concat(ghosts.map(&:to_sprite))
     clipped = sprites.map { |s| s.merge(x: s[:x] - visible[:x], y: s[:y] - visible[:y]) }
 
     outputs[:clipped_area].background_color = CLIP_BACKGROUND
