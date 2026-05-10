@@ -27,7 +27,10 @@ class Game
     )
     @pellets = Pellets.from_maze(@maze)
     @renderer = Renderer.new(@projection)
+    initialize_player
+  end
 
+  def initialize_player
     spawn = @projection.cell_rect(*PLAYER_SPAWN)
     @player = Player.new(
       x: spawn[:x], y: spawn[:y],
@@ -46,14 +49,22 @@ class Game
       player: @player,
       pellets: @pellets
     )
-    intent = @player.controller.next_direction(world)
-    @player.try_turn(intent, @maze, @projection)
-    @player.advance(@maze, @projection)
-    eat_pellets
+    tick_player(world)
     @renderer.draw(outputs, @maze, @pellets, @player)
   end
 
-  def eat_pellets
+  def tick_player(world)
+    player_moves(world)
+    player_eat_pellets
+  end
+
+  def player_moves(world)
+    intent = @player.controller.next_direction(world)
+    @player.try_turn(intent, @maze, @projection)
+    @player.advance(@maze, @projection)
+  end
+
+  def player_eat_pellets
     @projection.cells_touched(@player.rect).each do |gx, gy|
       @pellets.eat(gx, gy) if @pellets.at(gx, gy)
     end
