@@ -31,7 +31,7 @@
 
 ### Design Philosophy
 
-- **4 colored dot types** = 4 different tracks (drums, bass, synth, vocals)
+- **4 colored dot types** = 4 different tracks (drums, bass, lead, vocals)
 - Each color spawns ~16–20 dots across the maze (total ~64–80 dots per level)
 - Dots are thematically simple; all complexity is in audio response
 
@@ -229,8 +229,8 @@ _Reset counter when invincibility expires or next power pellet is eaten._
 - **Structure**: 4 independent tracks
   - Track 1: Drums (kick, snare, hi-hat patterns)
   - Track 2: Bass (low-frequency melodic line)
-  - Track 3: Synth (melody or harmonic pad)
-  - Track 4: Vocals or FX (leads, arpeggios, or ambient sounds)
+  - Track 3: Lead (melody or harmonic pad)
+  - Track 4: Vocals or CHORDS (leads, arpeggios, or ambient sounds)
 - **Length**: 64 steps each (~4 bars at standard BPM)
 - **BPM**: 120 BPM (or your preference; keep it consistent)
 - **Key**: All tracks in the same key (e.g., C major or A minor) so they harmonize
