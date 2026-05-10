@@ -20,7 +20,7 @@ class Ghost
   attr_accessor :state, :controller
   attr_reader :identity, :scatter_target, :spawn_cell
 
-  def initialize(identity:, x:, y:, w:, h:, speed:, scatter_target:, spawn_cell:, controller:, direction: Direction::LEFT)
+  def initialize(identity:, x:, y:, w:, h:, speed:, scatter_target:, spawn_cell:, controller:, direction: Direction::LEFT, sprite_scale: 2.0, sprite_offset_x: nil, sprite_offset_y: nil)
     init_grid_mover(x: x, y: y, w: w, h: h, speed: speed, direction: direction)
     @identity = identity
     @scatter_target = scatter_target
@@ -28,21 +28,28 @@ class Ghost
     @controller = controller
     @state = :scatter
     @base_speed = speed
+    @sprite_scale = sprite_scale
+    # Default: center the scaled sprite over the 1-cell logical rect.
+    @sprite_offset_x = sprite_offset_x || (w * @sprite_scale - w) / 2.0
+    @sprite_offset_y = sprite_offset_y || (h * @sprite_scale - h) / 2.0
   end
 
   def base_speed
     @base_speed
   end
 
-  # Sprite is 2 tiles wide and tall (arcade-faithful 2x2 quad). The actor's
-  # logical rect (collision/movement) stays 1 cell; only the sprite is doubled.
-  # Anchor = bottom-left of the 2x2 quad in world coords (screen Y-up).
+  # Sprite is rendered at sprite_scale times the logical 1-cell rect (default
+  # 2x = arcade 2x2 quad), centered via sprite_offset_x/y. Tweak via init args.
   def to_sprite
     path = case @state
            when :frightened then SPRITES[:frightened]
            when :eaten      then SPRITES[:eaten]
            else SPRITES[@identity]
            end
-    { x: @x, y: @y, w: @w * 2, h: @h * 2, path: path }
+    {
+      x: @x - @sprite_offset_x, y: @y - @sprite_offset_y,
+      w: @w * @sprite_scale, h: @h * @sprite_scale,
+      path: path
+    }
   end
 end
