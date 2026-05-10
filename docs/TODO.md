@@ -27,12 +27,14 @@
 
 ## Gameplay
 
-
 - different maps
 - different tracks
 - mechanics:
   - button to toggle dot eating for chain reaction scoring
-  - jump
+  - jump/sink to avoid eating
+- level-complete feedback:
+  - allow DJing a bit (mute, solo, filters, beat repeat)
+- mini daw to build tracks
 
 ## Visuals
 
