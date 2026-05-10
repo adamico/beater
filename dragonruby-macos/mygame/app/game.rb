@@ -18,7 +18,6 @@ class Game
   CELL_SIZE = 20
   OFFSET_X = CELL_SIZE * 16
   OFFSET_Y = CELL_SIZE * 2
-  PLAYER_SPAWN = [4, 8].freeze
   PLAYER_SPEED = 2
 
   GHOST_SPEED            = 2
@@ -63,6 +62,7 @@ class Game
     @pellets = Pellets.from_maze(@maze)
     @renderer = Renderer.new(@projection)
     @spawn_cells = scan_spawn_cells
+    @player_spawn = scan_player_spawn
     @above_door_cell = @spawn_cells[:blinky]
     @dot_count = 0
     @ticks_since_release = 0
@@ -77,8 +77,15 @@ class Game
     initialize_ghosts
   end
 
+  def scan_player_spawn
+    @maze.each_cell do |gx, gy, ch|
+      return [gx, gy] if ch == Tiles::SPAWN_PLAYER
+    end
+    raise "No player spawn (#{Tiles::SPAWN_PLAYER}) in layout"
+  end
+
   def initialize_player
-    spawn = @projection.cell_rect(*PLAYER_SPAWN)
+    spawn = @projection.cell_rect(*@player_spawn)
     @player = Player.new(
       x: spawn[:x], y: spawn[:y],
       w: CELL_SIZE, h: CELL_SIZE,
@@ -326,7 +333,7 @@ class Game
   end
 
   def player_dies
-    spawn = @projection.cell_rect(*PLAYER_SPAWN)
+    spawn = @projection.cell_rect(*@player_spawn)
     @player.x = spawn[:x]
     @player.y = spawn[:y]
     @player.face(Direction::RIGHT)

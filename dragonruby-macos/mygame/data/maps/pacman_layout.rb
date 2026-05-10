@@ -24,7 +24,7 @@ module MapLayouts
     %w(Rv............vv............vL),
     %w(Rv.1hh2.1hhh2.vv.1hhh2.1hh2.vL),
     %w(Rv.3h2v.3hhh4.34.3hhh4.v1h4.vL),
-    %w(Rvo..vv................vv..ovL),
+    %w(Rvo..vv.......P_.......vv..ovL),
     %w(R3h2.vv.12.1hhhhhh2.12.vv.1h4L),
     %w(R1h4.34.vv.3hh21hh4.vv.34.3h2L),
     %w(Rv......vv....vv....vv......vL),
