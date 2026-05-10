@@ -10,6 +10,8 @@ emit these chars; runtime modules read them.
 | `.`  | Regular pellet       | yes      | `:pellet`  | Default for corridor floor              |
 | `o`  | Power pellet         | yes      | `:power`   | Larger pellet, ghost-fright timer       |
 | `_`  | Empty floor          | yes      | none       | Tunnel mouths, ghost house, spawn area  |
+| `-`  | Ghost-house door     | role     | none       | Walkable only for `:ghost_eaten` (down) and `:ghost_leaving` (up); wall to player + active ghosts |
+| `G`  | Ghost-house home cell| yes      | none       | Marks the pen's anchor cell; ghost identities (Blinky/Pinky/Inky/Clyde) are assigned in code at fixed offsets from `G` |
 | `1`  | Wall, corner BR      | no       | —          | Bottom + right segments meet at center  |
 | `2`  | Wall, corner BL      | no       | —          | Bottom + left                           |
 | `3`  | Wall, corner TR      | no       | —          | Top + right                             |
@@ -23,9 +25,18 @@ Reserved (not yet emitted by `MapGenerator`, planned):
 | Char | Meaning        | Notes                              |
 |------|----------------|------------------------------------|
 | `P`  | Player spawn   | Replaces hardcoded `PLAYER_SPAWN`  |
-| `G`  | Ghost spawn    | Multiple per layout                |
 
 `pacman_layout.rb` is the source of truth for the map and is hand-authored.
+
+## Passability Roles
+
+`Tiles.passable_for?(ch, role)` is the policy table. `Maze#walkable?(gx, gy, role: :default)` delegates. Roles:
+
+- `:default` — player + active ghosts. Walls + door block.
+- `:ghost_eaten` — eyes returning to pen. Door + interior empties pass.
+- `:ghost_leaving` — ghost exiting pen via door. Door passes.
+
+Adding a new actor mode = add a role + a column. Maze stays dumb.
 
 ## Modules
 
@@ -37,8 +48,16 @@ Reserved (not yet emitted by `MapGenerator`, planned):
 - **Direction** — value object: `Direction::UP/DOWN/LEFT/RIGHT/NONE`, each with `.dx`, `.dy`, `.opposite`. Replaces ad-hoc symbols and dx/dy pairs across actor code.
 - **GridMover** — mixin providing grid-aligned movement. Holds `x, y, w, h, dx, dy, speed` state and `try_turn(direction, maze, projection)` / `advance(maze, projection)` methods. Player and Ghost both `include GridMover`.
 - **Controller** — strategy object that decides an actor's next direction. `Controller#next_direction(world) -> Direction`. `KeyboardController` reads `world.inputs` for the player; ghost controllers (chase/scatter/frightened) come later. Pure function of `world`; mode swap is `actor.controller = NewController.new`.
-- **World** — per-tick bag passed to controllers (`inputs`, `maze`, `projection`, `player`, `pellets`). Built by Game each tick; private to the actor/controller pipeline.
-- **Renderer** — owns all drawing. `draw(outputs, maze, pellets, player)` pushes primitives into DR's outputs each tick. Holds the projection; stateless w.r.t. outputs. Theme constants (colors, pellet sizes) live here.
+- **World** — per-tick bag passed to controllers (`inputs`, `maze`, `projection`, `player`, `pellets`, `ghosts`). Built by Game each tick; private to the actor/controller pipeline. Ghost controllers read peers via `world.ghosts` (Inky needs Blinky's tile).
+- **Renderer** — owns all drawing. `draw(outputs, maze, pellets, player, ghosts)` pushes primitives into DR's outputs each tick. Holds the projection; stateless w.r.t. outputs. Theme constants (colors, pellet sizes) live here.
+- **Ghost** — actor like Player; `include GridMover`. Holds identity (`:blinky/:pinky/:inky/:clyde`), scatter-corner target, `state` (`:in_house/:leaving_house/:scatter/:chase/:frightened/:eaten`), and current `controller`. Identity is fixed; state + controller swap. Sprite resolves via state+identity (`square/red.png`, `square/white.png` frightened, `square/empty.png` eaten).
+- **GhostHouse** — _planned, not yet implemented_. Will hold door tile coord, above-door tile, 4 home-slot coords, and the `LeavingHouse` waypoint path. Current MVP picks 4 spawn cells by scanning the maze for `_` cells farthest from the player; eaten ghost retargets its own spawn cell directly (no eyes path through a door yet). Adding the pen requires editing `pacman_layout.rb` to introduce `G` and `-` cells.
+- **Ghost controllers** — one per behavior: `BlinkyController` (target = player tile), `PinkyController` (4 ahead of player, **with arcade up-direction overflow bug intentionally replicated**), `InkyController` (reflect Blinky tile through 2-ahead-of-player), `ClydeController` (player tile if ≥8 tiles away, else scatter corner), `FrightenedController` (random non-reverse exit at intersections), `EatenController` (target = door, then home-slot), `LeavingHouseController` (waypoint path). Decisions taken at intersections (`GridMover#at_cell_center?` + ≥2 non-reverse exits); else `NONE`. Reverse excluded from candidates.
+- **Release schedule** — arcade-faithful per-ghost dot counter (Pinky:0, Inky:30, Clyde:60 at level 1) + 4s stall timer. Blinky starts outside the pen.
+- **Scatter/Chase phase** — global timer in Game (7s scatter / 20s chase, arcade phase table). Pauses while any ghost frightened. On phase change, all non-frightened/non-eaten ghosts reverse direction.
+- **Power-pellet → Frightened** — all non-eaten ghosts reverse, swap to `FrightenedController`, slow to ~50% speed, 10s timer. On expiry, re-swap to active (Scatter or Chase per phase). Eaten ghost is unaffected.
+- **Speeds** — ghost = 0.75× player, frightened = 0.5×, eaten = ghost speed (MVP; tunnel slowdown deferred).
+- **Player↔ghost collision** — AABB after advance. Active ghost → reset all actors to spawn (lives stubbed). Frightened ghost → +200/400/800/1600, ghost → `Eaten`. Eaten ghost → no-op.
 
 Agents (Player, future Enemy) consult **Maze** (semantics) + **GridProjection** (geometry).
 

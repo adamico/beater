@@ -26,10 +26,10 @@ class Maze
     @height = height
   end
 
-  def walkable?(gx, gy)
+  def walkable?(gx, gy, role: Tiles::ROLE_DEFAULT)
     gx, gy = wrap(gx, gy)
     return false if gy < 0 || gy >= @height
-    Tiles.walkable?(@chars[gy][gx])
+    Tiles.passable_for?(@chars[gy][gx], role)
   end
 
   # Toroidal coord normalization on the X axis. Y is not wrapped: maps with

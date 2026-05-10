@@ -18,11 +18,11 @@ class Renderer
     @projection = projection
   end
 
-  def draw(outputs, maze, pellets, player)
+  def draw(outputs, maze, pellets, player, ghosts = [])
     outputs.background_color = BACKGROUND
     draw_walls(outputs, maze)
     draw_pellets(outputs, pellets)
-    draw_player(outputs, maze, player)
+    draw_actors(outputs, maze, player, ghosts)
   end
 
   def draw_walls(outputs, maze)
@@ -43,20 +43,18 @@ class Renderer
     outputs.solids << solids
   end
 
-  # Render the player into an off-screen target sized to the visible play
-  # area, then blit. The clip hides the sprite as it crosses the wrap seam
-  # so it doesn't peek out of the wrap-edge columns.
-  def draw_player(outputs, maze, player)
+  # Render player + ghosts into an off-screen target sized to the visible play
+  # area, then blit. The clip hides sprites as they cross the wrap seam.
+  def draw_actors(outputs, maze, player, ghosts)
     visible = @projection.rect_for_cell_bounds(maze.visible_cell_bounds)
-    sprite = player.to_sprite
+
+    sprites = [player.to_sprite] + ghosts.map(&:to_sprite)
+    clipped = sprites.map { |s| s.merge(x: s[:x] - visible[:x], y: s[:y] - visible[:y]) }
 
     outputs[:clipped_area].background_color = CLIP_BACKGROUND
     outputs[:clipped_area].w = visible[:w]
     outputs[:clipped_area].h = visible[:h]
-    outputs[:clipped_area].sprites << sprite.merge(
-      x: sprite[:x] - visible[:x],
-      y: sprite[:y] - visible[:y]
-    )
+    outputs[:clipped_area].sprites << clipped
 
     outputs.sprites << {
       x: visible[:x], y: visible[:y],
