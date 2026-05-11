@@ -1,0 +1,3 @@
+# Rhythm-Quantized Player Commit Timing
+
+Player input commits to 16th-note beat boundaries derived from per-level BPM, with floating-time accumulation, a 3-frame early grace window, and continuous movement between commits. We chose this over audio-only quantization and over strict cell-step chunking so the game keeps Pac-Man flow while making rhythm timing mechanically meaningful and learnable. Gameplay outcomes (pellet consumption, frightened activation, collisions) resolve immediately for fairness, while selected SFX are step-queued to preserve musical coherence.

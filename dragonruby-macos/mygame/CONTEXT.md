@@ -71,6 +71,36 @@ Agents (Player, future Enemy) consult **Maze** (semantics) + **GridProjection** 
 - **Track progression** — each pellet color maps to one music stem. Collecting pellets raises that stem's gain from its configured `start_gain` toward `end_gain`.
 - **Procedural SFX** — gameplay feedback sounds (`dot_tick`, `power_pellet`, `enemy_eaten`, `game_over`) are still synthesized at runtime. Music simplification does not remove procedural SFX.
 
+## Rhythm Timing
+
+- **Beat step** — a 16th-note timing boundary derived from level BPM.
+- **Quantized movement** — player movement commits to beat steps rather than firing immediately on input.
+- **Quantized dot feedback** — dot-eat SFX resolves on the same beat step boundary as movement commitment.
+- **Responsiveness window** — a small early/late input grace window is allowed so rhythm-locking feels intentional instead of laggy.
+- **Tempo source of truth** — each level owns BPM, and runtime timing derives from BPM using floating accumulation (no rounded integer frame buckets).
+- **Input scheduling** — input snaps to upcoming beat step; if input lands within 3 frames before boundary, it executes on that boundary, else on next one; never snaps backward.
+- **Commit override** — during ramp, a new input can cancel and restart ramp only when that new direction is currently valid (no wall).
+- **Wall handling during commit** — if committed direction becomes blocked before boundary, commit cancels immediately and player returns to idle input polling.
+- **Collision during commit** — ghost collision rules are unchanged while committing; commit state grants no protection.
+- **Ramp curve default** — commit acceleration uses square-root easing (`sqrt(t)`) to front-load responsiveness.
+- **Post-commit movement model** — after commit boundary, movement remains continuous; quantization applies to direction commits and rhythmic feedback timing.
+- **Pellet feedback split** — pellet removal resolves immediately on collision; dot-eat SFX is queued to next beat step boundary.
+- **Power-pellet timing split** — power pellet consumption and frightened-state activation resolve immediately; power-pellet SFX is queued to next beat step boundary.
+- **Queued dot SFX cap** — at most one dot-tick SFX plays per beat step; additional same-step pellet events still apply gameplay/progression but do not stack dot ticks.
+- **SFX conflict priority** — if dot-tick and power-pellet SFX are both queued for the same step, play only power-pellet SFX and suppress dot-tick.
+- **Queued SFX staleness** — queued rhythmic SFX expires if it is more than one beat step late; stale events are dropped.
+- **Beat indicator** — gameplay shows an always-on subtle beat pulse to communicate timing boundaries.
+- **Commit anticipation animation** — player always shows squash/stretch wind-up during commit ramp to signal locked timing.
+- **Timing tuning scope** — grace window, ramp curve, and ramp duration scaling are per-level settings with global defaults.
+- **Ghost tempo coupling** — ghost speeds remain state ratios of player speed, and player speed is BPM-derived.
+- **Beat subdivision** — rhythmic step boundaries are fixed at 16th-note resolution for MVP.
+- **Implementation order** — first shipping slice is core timing and commit mechanics (BeatClock + scheduler + commit state), then feedback polish.
+- **Slice-1 acceptance gates** — scheduler deterministic under fixed ticks; commit timing stays on beat grid in long run; wall-block + reramp rules hold consistently.
+- **Runtime safety fallback** — if rhythm scheduler desyncs/fails, game auto-falls back to immediate movement and immediate SFX with warning log.
+- **Fallback trigger control** — fallback is triggered by automatic runtime invariant checks and can also be toggled manually via debug control.
+- **Diagnostics visibility** — rhythm debug overlay/logging is detailed in development builds and minimal in release builds.
+- **MVP rule freeze** — rhythm rules are frozen until slice-1 acceptance gates pass; only bug fixes are allowed during this phase.
+
 ## Tunnel
 
 A **Tunnel** is a horizontal corridor whose `_` cells touch column 0 and column `width-1` on the same row. **Wrapping** is the act of crossing the seam: actor walks off one edge and reappears fully on the opposite edge.
