@@ -118,25 +118,21 @@ module Audio
       cfg = @configs[track]
       t   = t.clamp(0.0, 1.0)
 
-      gain = cfg.start_gain + t * (cfg.end_gain - cfg.start_gain)
-
       cutoff_hz = interpolated_cutoff_hz(cfg, t)
-      resonance = interpolated_resonance(cfg, t)
-      bypass_mix = cfg.bypass_at_full? ? t : 0.0
 
-      [cutoff_hz, resonance, gain, bypass_mix]
+      [cutoff_hz]
     end
 
     def sync_gains(args)
       TRACKS.each do |n|
-        cutoff_hz, resonance, gain, bypass_mix = interpolated_params(n, @completion[n])
+        cutoff_hz = interpolated_params(n, @completion[n]).first
         @players[n].apply_mix_settings(
           args,
-          gain: gain,
+          gain: 1.0,
           cutoff_hz: cutoff_hz,
-          resonance: resonance,
+          resonance: nil,
           duck_multiplier: duck_gain_multiplier,
-          bypass_mix: bypass_mix
+          bypass_mix: 1.0
         )
       end
     end
@@ -154,12 +150,6 @@ module Audio
       start_ln = Math.log(start_hz)
       end_ln = Math.log(end_hz)
       Math.exp(start_ln + t * (end_ln - start_ln))
-    end
-
-    def interpolated_resonance(cfg, t)
-      return nil unless cfg.start_resonance.is_a?(Numeric) && cfg.end_resonance.is_a?(Numeric)
-
-      cfg.start_resonance + t * (cfg.end_resonance - cfg.start_resonance)
     end
 
     def prune_sfx(args)

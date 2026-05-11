@@ -122,6 +122,8 @@ module ProgressionTester
     args.state.pt_version    = TOOL_VERSION
     args.state.pt_completion = { drums: 0.0, bass: 0.0, lead: 0.0, chords: 0.0 }
     args.state.pt_solo       = nil          # nil = no solo, else track symbol
+    args.state.pt_muted      = { drums: false, bass: false, lead: false, chords: false }
+    args.state.pt_gain_override = { drums: 1.0, bass: 1.0, lead: 1.0, chords: 1.0 }
     args.state.pt_dragging   = nil          # track being dragged
     args.state.pt_drag_start = nil          # [mouse_y, completion_at_start]
     args.state.pt_meter      = { drums: 0.0, bass: 0.0, lead: 0.0, chords: 0.0 }
@@ -186,6 +188,17 @@ module ProgressionTester
     mouse = args.inputs.mouse
 
     if mouse.button_left && mouse.down
+      # Check if clicking on per-track mute buttons
+      TRACK_ORDER.each_with_index do |track, i|
+        mute_rect = mute_btn_rect(i)
+        if point_in_rect?(mx, my, mute_rect)
+          args.state.pt_muted[track] = !args.state.pt_muted[track]
+          state = args.state.pt_muted[track] ? 'MUTED' : 'UNMUTED'
+          post_message(args, "#{TRACK_NAMES[track]} #{state}")
+          return
+        end
+      end
+
       # Check if clicking on a fader thumb
       TRACK_ORDER.each_with_index do |track, i|
         thumb_rect = fader_thumb_rect(args, track, i)
@@ -252,6 +265,7 @@ module ProgressionTester
     audio.tick(args)
 
     solo = args.state.pt_solo
+    muted = args.state.pt_muted
 
     TRACK_ORDER.each do |track|
       comp = args.state.pt_completion[track]
@@ -265,10 +279,16 @@ module ProgressionTester
       # Solo logic: mute non-soloed tracks via args.audio gain override
       key = :"track_#{track}"
       if args.audio[key]
-        if solo && solo != track
-          args.audio[key].gain = 0.0
+        target_gain = if muted[track] || (solo && solo != track)
+                        0.0
+                      else
+                        1.0
+                      end
+
+        if (args.state.pt_gain_override[track] - target_gain).abs > 0.001
+          args.audio[key].gain = target_gain
+          args.state.pt_gain_override[track] = target_gain
         end
-        # (Normal gain is set by AudioManager#sync_gains via tick above)
       end
     end
 
@@ -369,8 +389,7 @@ module ProgressionTester
     out.labels << label(sx + STRIP_W / 2, STRIP_Y0 + STRIP_H - 62,
                         pct_text, size: 3, align: 1, **PAL[:led_green])
 
-    # ── Stem / gain readout ──
-    gain = interpolated_gain_for(cfg, comp)
+    # ── Stem / filter readout ──
     out.labels << label(sx + STRIP_W / 2, STRIP_Y0 + STRIP_H - 100,
                         'LOOPING STEM', size: -2, align: 1, **PAL[:label])
 
@@ -379,9 +398,14 @@ module ProgressionTester
     out.labels << label(sx + STRIP_W / 2, STRIP_Y0 + STRIP_H - 114,
                         stem_name, size: -2, align: 1, **PAL[:label_bright])
 
-    # ── Gain readout ──
-    out.labels << label(sx + STRIP_W / 2, STRIP_Y0 + STRIP_H - 128,
-                        "GN #{"%.2f" % gain}", size: -2, align: 1, **PAL[:label])
+    # ── Filter parameter (cutoff only) ──
+    cutoff_hz = interpolated_cutoff_hz_for(cfg, comp)
+
+    if cutoff_hz
+      cutoff_text = cutoff_hz > 1000 ? "#{"%.1f" % (cutoff_hz / 1000)}kHz" : "#{"%.0f" % cutoff_hz}Hz"
+      out.labels << label(sx + STRIP_W / 2, STRIP_Y0 + STRIP_H - 128,
+                          "FC #{cutoff_text}", size: -2, align: 1, **PAL[:label])
+    end
 
     # ── Fader rail ──
     rail = fader_rail_rect(idx)
@@ -425,6 +449,16 @@ module ProgressionTester
                          solo_btn.y + solo_btn.h / 2 + 4,
                          'S', size: -1, align: 1,
                          **( solo_lit ? PAL[:bg] : PAL[:label] ))
+
+              # ── Mute button ──
+              mute_btn = mute_btn_rect(idx)
+              muted = args.state.pt_muted[track]
+              out.solids  << bg_rect(mute_btn.x, mute_btn.y, mute_btn.w, mute_btn.h,
+                           muted ? PAL[:led_red] : PAL[:solo_idle])
+              out.labels  << label(mute_btn.x + mute_btn.w / 2,
+                         mute_btn.y + mute_btn.h / 2 + 4,
+                         'M', size: -1, align: 1,
+                         **( muted ? PAL[:bg] : PAL[:label] ))
 
     # ── Progression badge ──
     out.labels << label(sx + STRIP_W / 2, STRIP_Y0 + 12,
@@ -577,6 +611,11 @@ module ProgressionTester
     { x: sx + STRIP_W / 2 - 14, y: STRIP_Y0 + 28, w: 28, h: 20 }
   end
 
+  def self.mute_btn_rect(idx)
+    sx = strip_x(idx)
+    { x: sx + STRIP_W / 2 - 14, y: STRIP_Y0 + 52, w: 28, h: 20 }
+  end
+
   def self.point_in_rect?(x, y, rect)
     x >= rect[:x] && x <= rect[:x] + rect[:w] &&
       y >= rect[:y] && y <= rect[:y] + rect[:h]
@@ -595,17 +634,28 @@ module ProgressionTester
   # Audio / config helpers (mirrors AudioManager private logic for display)
   # ---------------------------------------------------------------------------
 
-  def self.interpolated_gain_for(cfg, t)
+  def self.interpolated_cutoff_hz_for(cfg, t)
+    return nil unless cfg.start_cutoff.is_a?(Numeric)
+
+    end_cutoff = cfg.end_cutoff == :bypass ? cfg.start_cutoff : cfg.end_cutoff
+    return nil unless end_cutoff.is_a?(Numeric)
+
     t = t.clamp(0.0, 1.0)
-    cfg.start_gain + t * (cfg.end_gain - cfg.start_gain)
+    start_hz = cfg.start_cutoff.to_f.clamp(20.0, 20_000.0)
+    end_hz = end_cutoff.to_f.clamp(20.0, 20_000.0)
+    return start_hz if start_hz == end_hz
+
+    start_ln = Math.log(start_hz)
+    end_ln = Math.log(end_hz)
+    Math.exp(start_ln + t * (end_ln - start_ln))
   end
 
   def self.progression_badge(completion)
     case completion
-    when 0.0...0.25 then 'INTRO  ·  LOW GAIN'
-    when 0.25...0.50 then 'BUILD  ·  OPENING'
-    when 0.50...0.75 then 'LIFT   ·  STRONGER'
-    else                  'FULL   ·  MAX GAIN'
+    when 0.0...0.25 then 'INTRO  ·  DARK LP'
+    when 0.25...0.50 then 'BUILD  ·  OPENING LP'
+    when 0.50...0.75 then 'LIFT   ·  WIDER LP'
+    else                  'FULL   ·  OPEN LP'
     end
   end
 end

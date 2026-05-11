@@ -103,6 +103,7 @@ module Audio
 
         unless runtime_available?
           @load_error = "ffi runtime unavailable"
+          puts "[Audio::NativeBridge] FFI runtime check failed: #{@load_error}"
           return
         end
 
@@ -110,10 +111,18 @@ module Audio
         @load_error = nil
       rescue StandardError => e
         @load_error = e.message
+        puts "[Audio::NativeBridge] Failed to load native extension: #{e.message}"
       end
 
       def runtime_available?
-        Object.const_defined?(:DR) && DR.respond_to?(:ffi_misc) && !DR.ffi_misc.nil?
+        return false unless Object.const_defined?(:DR)
+
+        begin
+          misc = DR.ffi_misc
+          !misc.nil? && misc.respond_to?(:gtk_dlopen)
+        rescue StandardError
+          false
+        end
       end
 
       def warn_once

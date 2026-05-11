@@ -32,8 +32,8 @@ typedef struct {
    ============================================================================ */
 
 typedef struct {
-  float z1_lp, z2_lp;  /* Lowpass delay line */
-  float z1_hp, z2_hp;  /* Highpass delay line */
+  float z1_lp[2], z2_lp[2];  /* Lowpass delay line per channel */
+  float z1_hp[2], z2_hp[2];  /* Highpass delay line per channel */
   float b0_lp, b1_lp, b2_lp, a1_lp, a2_lp;  /* LP coeffs */
   float b0_hp, b1_hp, b2_hp, a1_hp, a2_hp;  /* HP coeffs */
 } BiquadState;
@@ -71,6 +71,11 @@ static AudioState g_state = {0};
 
 static int read_wav_file(const char *path, WavBuffer *out) {
   FILE *f = fopen(path, "rb");
+  if (!f && path && path[0] != '/') {
+    char game_relative[1024];
+    snprintf(game_relative, sizeof(game_relative), "mygame/%s", path);
+    f = fopen(game_relative, "rb");
+  }
   if (!f) return -1;
 
   uint8_t header[12];
@@ -203,19 +208,17 @@ static void biquad_highpass(float cutoff_hz, float Q, BiquadState *state) {
    Biquad Filter Application
    ============================================================================ */
 
-static inline float biquad_process_lp(BiquadState *state, float x) {
-  float y = state->b0_lp * x + state->b1_lp * 0 + state->b2_lp * 0 
-           - state->a1_lp * state->z1_lp - state->a2_lp * state->z2_lp;
-  state->z2_lp = state->z1_lp;
-  state->z1_lp = y;
+static inline float biquad_process_lp(BiquadState *state, float x, int ch) {
+  float y = state->b0_lp * x + state->z1_lp[ch];
+  state->z1_lp[ch] = state->b1_lp * x - state->a1_lp * y + state->z2_lp[ch];
+  state->z2_lp[ch] = state->b2_lp * x - state->a2_lp * y;
   return y;
 }
 
-static inline float biquad_process_hp(BiquadState *state, float x) {
-  float y = state->b0_hp * x + state->b1_hp * 0 + state->b2_hp * 0 
-           - state->a1_hp * state->z1_hp - state->a2_hp * state->z2_hp;
-  state->z2_hp = state->z1_hp;
-  state->z1_hp = y;
+static inline float biquad_process_hp(BiquadState *state, float x, int ch) {
+  float y = state->b0_hp * x + state->z1_hp[ch];
+  state->z1_hp[ch] = state->b1_hp * x - state->a1_hp * y + state->z2_hp[ch];
+  state->z2_hp[ch] = state->b2_hp * x - state->a2_hp * y;
   return y;
 }
 
@@ -245,13 +248,13 @@ static void track_process_chunk(TrackState *track, uint32_t frame_count, float *
     float r = track->wav.samples[sample_idx * 2 + 1];
 
     if (track->track_type == 1) {
-      l = biquad_process_lp(&track->biquad, l);
-      r = biquad_process_lp(&track->biquad, r);
+      l = biquad_process_lp(&track->biquad, l, 0);
+      r = biquad_process_lp(&track->biquad, r, 1);
     } else if (track->track_type == 2) {
-      float lp_l = biquad_process_lp(&track->biquad, l);
-      float lp_r = biquad_process_lp(&track->biquad, r);
-      float hp_l = biquad_process_hp(&track->biquad, l);
-      float hp_r = biquad_process_hp(&track->biquad, r);
+      float lp_l = biquad_process_lp(&track->biquad, l, 0);
+      float lp_r = biquad_process_lp(&track->biquad, r, 1);
+      float hp_l = biquad_process_hp(&track->biquad, l, 0);
+      float hp_r = biquad_process_hp(&track->biquad, r, 1);
       float morph = track->bypass_mix;
       l = hp_l * (1.0f - morph) + lp_l * morph;
       r = hp_r * (1.0f - morph) + lp_r * morph;
@@ -277,20 +280,15 @@ static mrb_value ffi_load_stem(mrb_state *mrb, mrb_value self) {
   drb_api->mrb_get_args(mrb, "zz", &track_name, &file_path);
 
   TrackState *track = NULL;
-  int track_type = 0;
 
   if (strcmp(track_name, "drums") == 0) {
     track = &g_state.drums;
-    track_type = 2;
   } else if (strcmp(track_name, "bass") == 0) {
     track = &g_state.bass;
-    track_type = 1;
   } else if (strcmp(track_name, "lead") == 0) {
     track = &g_state.lead;
-    track_type = 2;
   } else if (strcmp(track_name, "chords") == 0) {
     track = &g_state.chords;
-    track_type = 1;
   } else {
     return drb_api->mrb_str_new_cstr(mrb, "unknown track name");
   }
@@ -299,20 +297,15 @@ static mrb_value ffi_load_stem(mrb_state *mrb, mrb_value self) {
     return drb_api->mrb_str_new_cstr(mrb, "failed to load or invalid WAV file");
   }
 
-  track->track_type = track_type;
+  track->track_type = 1; /* lowpass-only mode */
   track->offset_frames = 0;
   track->cutoff_hz = 1000.0f;
-  track->resonance = 1.0f;
-  track->gain = 0.5f;
-  track->bypass_mix = 0.0f;
+  track->resonance = 0.707f;
+  track->gain = 1.0f;
+  track->bypass_mix = 1.0f;
   memset(&track->biquad, 0, sizeof(BiquadState));
 
-  if (track_type == 1) {
-    biquad_lowpass(track->cutoff_hz, track->resonance, &track->biquad);
-  } else if (track_type == 2) {
-    biquad_lowpass(track->cutoff_hz, track->resonance, &track->biquad);
-    biquad_highpass(track->cutoff_hz, track->resonance, &track->biquad);
-  }
+  biquad_lowpass(track->cutoff_hz, track->resonance, &track->biquad);
 
   return mrb_nil_value();
 }
@@ -339,16 +332,12 @@ static mrb_value ffi_configure_track(mrb_state *mrb, mrb_value self) {
   }
 
   if (cutoff_hz > 0) track->cutoff_hz = cutoff_hz;
-  if (resonance > 0) track->resonance = resonance;
-  if (gain >= 0) track->gain = gain;
-  if (bypass_mix >= 0) track->bypass_mix = bypass_mix;
 
-  if (track->track_type == 1) {
-    biquad_lowpass(track->cutoff_hz, track->resonance, &track->biquad);
-  } else if (track->track_type == 2) {
-    biquad_lowpass(track->cutoff_hz, track->resonance, &track->biquad);
-    biquad_highpass(track->cutoff_hz, track->resonance, &track->biquad);
-  }
+  /* Lowpass-only simplified mode: fixed Q and unity gain. */
+  track->resonance = 0.707f;
+  track->gain = 1.0f;
+  track->bypass_mix = 1.0f;
+  biquad_lowpass(track->cutoff_hz, track->resonance, &track->biquad);
 
   return mrb_nil_value();
 }

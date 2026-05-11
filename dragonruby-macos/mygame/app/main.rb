@@ -17,6 +17,14 @@ PROGRESSION_TESTER_MODE = (
 require 'tools/progression_tester.rb' if PROGRESSION_TESTER_MODE
 require 'app/game.rb' unless PROGRESSION_TESTER_MODE
 
+def boot args
+  begin
+    DR.ffi_misc.gtk_dlopen('audio_stem_fx')
+  rescue StandardError
+    # Native bridge will fall back to legacy mode if loading fails.
+  end
+end
+
 def tick args
   if PROGRESSION_TESTER_MODE
     ProgressionTester.tick(args)
