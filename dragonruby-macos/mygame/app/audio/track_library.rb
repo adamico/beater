@@ -40,7 +40,7 @@ module Audio
       TrackDefinition.new(pattern: pattern, wave_fn: wave_fn, sfx_fn: sfx_fn)
     end
 
-    BASS_NOTES = [:a3, :c3, :g3, :a3, :f3, :g3, :a3, :g3].freeze
+    BASS_NOTES = [:a2, :c2, :g2, :a2, :f2, :g2, :a2, :g2].freeze
 
     def self.build_bass
       cache   = {}
