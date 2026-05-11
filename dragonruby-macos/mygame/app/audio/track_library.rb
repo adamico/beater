@@ -51,18 +51,18 @@ module Audio
       TrackDefinition.new(pattern: pattern, wave_fn: wave_fn, sfx_fn: sfx_fn)
     end
 
-    SYNTH_ARP = [:a4, :c5, :e5, :g5, :e5, :c5, :a4, :e5].freeze
+    LEAD_ARP = [:a4, :c5, :e5, :g5, :e5, :c5, :a4, :e5].freeze
 
     def self.build_lead
       cache   = {}
       pattern = Array.new(64, nil)
-      64.times { |s| pattern[s] = SYNTH_ARP[s % SYNTH_ARP.length] if s.even? }
+      64.times { |s| pattern[s] = LEAD_ARP[s % LEAD_ARP.length] if s.even? }
       wave_fn = ->(n) { cache[n] ||= WaveGenerator.square_period(MusicTheory::NOTE_FREQUENCIES[n], duty: 0.25) }
       sfx_fn  = -> { WaveGenerator.square_period(MusicTheory::NOTE_FREQUENCIES[:a4], duty: 0.25).first(800) }
       TrackDefinition.new(pattern: pattern, wave_fn: wave_fn, sfx_fn: sfx_fn)
     end
 
-    FX_MELODY = [
+    CHORDS_MELODY = [
       :a4, nil, :c5, nil, :e5, nil, :d5, nil, :g5, nil, :e5, nil, :a4, nil, nil, nil,
       :c5, nil, :e5, nil, :g5, nil, :e5, nil, :d5, nil, :c5, nil, :a4, nil, nil, nil,
       :a5, nil, nil, nil, :g5, nil, :e5, nil, :d5, nil, :e5, nil, :g5, nil, nil, nil,
@@ -73,7 +73,7 @@ module Audio
       cache   = {}
       wave_fn = ->(n) { cache[n] ||= WaveGenerator.sine_period(MusicTheory::NOTE_FREQUENCIES[n]) }
       sfx_fn  = -> { WaveGenerator.sine_period(MusicTheory::NOTE_FREQUENCIES[:a5]).first(800) }
-      TrackDefinition.new(pattern: FX_MELODY.dup, wave_fn: wave_fn, sfx_fn: sfx_fn)
+      TrackDefinition.new(pattern: CHORDS_MELODY.dup, wave_fn: wave_fn, sfx_fn: sfx_fn)
     end
   end
 end
