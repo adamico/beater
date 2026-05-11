@@ -45,9 +45,12 @@ class Game
 
   EAT_POINTS = [200, 400, 800, 1600].freeze
   EAT_PAUSE_TICKS = 60 # 1s arcade-style freeze on eat
-  DUCK_GAIN_SCALE = 0.55
-  DUCK_RAMP_IN_TICKS = 8
-  DUCK_RAMP_OUT_TICKS = 8
+  EAT_DUCK_HOLD_RATIO = 0.75
+  PRE_EAT_DUCK_LOOKAHEAD_CELLS = 1.5
+  PRE_EAT_DUCK_LATERAL_TOL_CELLS = 0.8
+  DUCK_GAIN_SCALE = 0.4
+  DUCK_RAMP_IN_TICKS = 1
+  DUCK_RAMP_OUT_TICKS = 2
 
   SPAWN_MARKER_TO_IDENTITY = {
     Tiles::SPAWN_BLINKY => :blinky,
@@ -75,6 +78,8 @@ class Game
     @eat_chain = 0
     @score = 0
     @eat_pause_ticks = 0
+    @eat_duck_hold_ticks = 0
+    @eat_duck_releasing = false
     @eat_popup = nil
     @level_complete = false
     @audio_state_for = nil
@@ -175,12 +180,7 @@ class Game
     end
 
     if @eat_pause_ticks > 0
-      args.state.audio.set_duck(args, active: true,
-                                      gain_scale: DUCK_GAIN_SCALE,
-                                      ramp_in: DUCK_RAMP_IN_TICKS,
-                                      ramp_out: DUCK_RAMP_OUT_TICKS)
-      @eat_pause_ticks -= 1
-      @eat_popup = nil if @eat_pause_ticks == 0
+      process_eat_freeze_duck
       visible_ghosts = @ghosts.reject { |g| g.state == :eaten }
       @renderer.draw(outputs, @maze, @pellets, nil, visible_ghosts, popup: @eat_popup, level_complete: false)
       draw_audio_debug_watch if args.state.debug_audio
@@ -206,6 +206,7 @@ class Game
     )
 
     tick_player(world)
+    maybe_preduck_ghost_eat
     if check_level_complete
       @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, popup: @eat_popup, level_complete: true)
       draw_audio_debug_watch if args.state.debug_audio
@@ -367,6 +368,13 @@ class Game
   def eat_ghost(ghost)
     points = EAT_POINTS[[@eat_chain, EAT_POINTS.size - 1].min]
     @score += points
+    args.state.audio.set_duck(args, active: true,
+                                    gain_scale: DUCK_GAIN_SCALE,
+                                    ramp_in: DUCK_RAMP_IN_TICKS,
+                                    ramp_out: DUCK_RAMP_OUT_TICKS,
+                                    immediate: true)
+    # Audio tick normally runs at frame start; push updated duck now so hit is immediate.
+    args.state.audio.tick(args)
     args.state.audio.on_enemy_eaten(args, sequence: @eat_chain + 1)
     @eat_chain += 1
     ghost.state = :eaten
@@ -375,7 +383,69 @@ class Game
     ghost.speed = ghost.base_speed
     snap_to_cell(ghost)
     @eat_pause_ticks = EAT_PAUSE_TICKS
+    @eat_duck_hold_ticks = (EAT_PAUSE_TICKS * EAT_DUCK_HOLD_RATIO).to_i
+    @eat_duck_releasing = false
     @eat_popup = { x: ghost.x + ghost.w / 2, y: ghost.y + ghost.h / 2, text: points.to_s }
+  end
+
+  def process_eat_freeze_duck
+    if !@eat_duck_releasing
+      args.state.audio.set_duck(args, active: true,
+                                      gain_scale: DUCK_GAIN_SCALE,
+                                      ramp_in: DUCK_RAMP_IN_TICKS,
+                                      ramp_out: DUCK_RAMP_OUT_TICKS)
+      @eat_duck_hold_ticks -= 1
+      @eat_duck_releasing = true if @eat_duck_hold_ticks <= 0
+    else
+      args.state.audio.set_duck(args, active: false,
+                                      gain_scale: DUCK_GAIN_SCALE,
+                                      ramp_in: DUCK_RAMP_IN_TICKS,
+                                      ramp_out: DUCK_RAMP_OUT_TICKS)
+    end
+
+    @eat_pause_ticks -= 1 if @eat_pause_ticks > 0
+
+    # Freeze ends only after both base freeze budget and duck release complete.
+    if @eat_pause_ticks <= 0 && args.state.audio.duck_amount <= 0.001
+      @eat_pause_ticks = 0
+      @eat_duck_releasing = false
+      @eat_popup = nil
+    end
+  end
+
+  def maybe_preduck_ghost_eat
+    imminent = ghost_eat_imminent?
+    args.state.audio.set_duck(args, active: imminent,
+                                    gain_scale: DUCK_GAIN_SCALE,
+                                    ramp_in: DUCK_RAMP_IN_TICKS,
+                                    ramp_out: DUCK_RAMP_OUT_TICKS)
+  end
+
+  def ghost_eat_imminent?
+    dir = @player.direction
+    return false if dir.none?
+
+    lookahead = CELL_SIZE * PRE_EAT_DUCK_LOOKAHEAD_CELLS
+    lateral_tol = CELL_SIZE * PRE_EAT_DUCK_LATERAL_TOL_CELLS
+
+    px = @player.x + @player.w / 2.0
+    py = @player.y + @player.h / 2.0
+
+    @ghosts.any? do |g|
+      next false unless g.state == :frightened
+
+      gx = g.x + g.w / 2.0
+      gy = g.y + g.h / 2.0
+
+      rel_x = gx - px
+      rel_y = gy - py
+      forward = rel_x * dir.dx + rel_y * dir.dy
+
+      next false if forward < 0 || forward > lookahead
+
+      lateral = dir.horizontal? ? rel_y.abs : rel_x.abs
+      lateral <= lateral_tol
+    end
   end
 
   def player_dies

@@ -21,6 +21,8 @@ module Audio
       @duck_active     = false
       @duck_amount     = 0.0
       @duck_gain_scale = 1.0
+      @duck_ramp_in_ticks = 8
+      @duck_ramp_out_ticks = 8
       @backend_mode    = NativeBridge.backend_mode
 
       NativeBridge.load_stems(@definitions) if @backend_mode == :native
@@ -32,17 +34,24 @@ module Audio
 
     def tick(args)
       prune_sfx(args)
+      advance_duck_amount
       sync_gains(args)
     end
 
-    def set_duck(_args, active:, gain_scale: 0.55, ramp_in: 8, ramp_out: 8)
+    def set_duck(_args, active:, gain_scale: 0.55, ramp_in: 8, ramp_out: 8, immediate: false)
+      was_active = @duck_active
       @duck_active     = active
       @duck_gain_scale = gain_scale
-      @duck_amount     = active ? 1.0 : 0.0
+      @duck_ramp_in_ticks = [ramp_in.to_i, 1].max
+      @duck_ramp_out_ticks = [ramp_out.to_i, 1].max
+
+      if immediate && active && !was_active
+        @duck_amount = 1.0
+      end
     end
 
     def duck_gain_multiplier
-      1.0
+      (1.0 - @duck_amount * (1.0 - @duck_gain_scale)).clamp(0.0, 1.0)
     end
 
     def using_native_backend?
@@ -157,6 +166,16 @@ module Audio
       args.audio
         .select { |k, v| k.to_s.start_with?("sfx_") && v[:stop_at] && args.tick_count >= v[:stop_at] }
         .each_key { |k| args.audio.delete(k) }
+    end
+
+    def advance_duck_amount
+      if @duck_active
+        step = 1.0 / @duck_ramp_in_ticks
+        @duck_amount = [@duck_amount + step, 1.0].min
+      else
+        step = 1.0 / @duck_ramp_out_ticks
+        @duck_amount = [@duck_amount - step, 0.0].max
+      end
     end
   end
 end
