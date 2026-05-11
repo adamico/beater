@@ -25,12 +25,30 @@ module Audio
         mod.respond_to?(:configure_track) && mod.respond_to?(:next_chunk)
       end
 
-      def push_track_params(track_name:, completion:, cutoff_hz:, resonance:, gain:, bypass_mix:)
+      def load_stems(definitions)
+        return unless ready_for_streaming?
+
+        definitions.each do |track_name, definition|
+          error = extension_module.load_stem(track_name.to_s, definition.input_path)
+          if error.is_a?(String) && !error.empty?
+            @load_error = "#{track_name}: #{error}"
+            warn_once
+            return false
+          end
+        end
+
+        true
+      rescue StandardError => e
+        @load_error = e.message
+        warn_once
+        false
+      end
+
+      def push_track_params(track_name:, cutoff_hz:, resonance:, gain:, bypass_mix:)
         return unless ready_for_streaming?
 
         extension_module.configure_track(
           track_name.to_s,
-          completion.to_f,
           cutoff_hz ? cutoff_hz.to_f : -1.0,
           resonance ? resonance.to_f : -1.0,
           gain.to_f,

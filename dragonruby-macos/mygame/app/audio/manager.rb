@@ -23,6 +23,8 @@ module Audio
       @duck_gain_scale = 1.0
       @backend_mode    = NativeBridge.backend_mode
 
+      NativeBridge.load_stems(@definitions) if @backend_mode == :native
+
       TRACKS.each do |n|
         @players[n] = TrackPlayer.new(n, @definitions[n], args, backend: @backend_mode)
       end

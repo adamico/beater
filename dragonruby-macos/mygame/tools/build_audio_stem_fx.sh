@@ -9,6 +9,7 @@ OUT="$DRB_ROOT/mygame/native/macos/audio_stem_fx.dylib"
 mkdir -p "$(dirname "$OUT")"
 
 clang -dynamiclib -O2 \
+  -Wno-implicit-function-declaration \
   -isystem "$DRB_ROOT/include/" \
   -isystem "$DRB_ROOT/include/mruby/" \
   -o "$OUT" \

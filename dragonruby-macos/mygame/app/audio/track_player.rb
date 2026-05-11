@@ -38,7 +38,6 @@ module Audio
 
       NativeBridge.push_track_params(
         track_name: @track_name,
-        completion: @completion,
         cutoff_hz: cutoff_hz,
         resonance: resonance,
         gain: final_gain,
