@@ -171,9 +171,11 @@ module ProgressionTester
       return
     end
 
-    # Solo keys 1–4
+    # Solo keys 1-4 (DragonRuby key names: one/two/three/four)
+    solo_keys = [:one, :two, :three, :four]
     TRACK_ORDER.each_with_index do |track, i|
-      if kb.key_down.send(:"#{i + 1}")
+      key = solo_keys[i]
+      if key && kb.key_down.respond_to?(key) && kb.key_down.send(key)
         args.state.pt_solo = (args.state.pt_solo == track ? nil : track)
         msg = args.state.pt_solo ? "SOLO: #{TRACK_NAMES[track]}" : 'SOLO CLEARED'
         post_message(args, msg)
@@ -195,7 +197,7 @@ module ProgressionTester
         # Also check clicking anywhere on the fader rail to jump
         rail_rect = fader_rail_rect(i)
         if point_in_rect?(mx, my, rail_rect)
-          t = 1.0 - ((my - FADER_Y0).to_f / FADER_H).clamp(0.0, 1.0)
+          t = ((my - FADER_Y0).to_f / FADER_H).clamp(0.0, 1.0)
           set_track(args, track, t)
           args.state.pt_dragging   = track
           args.state.pt_drag_start = [my, t]
@@ -206,7 +208,7 @@ module ProgressionTester
 
     if mouse.button_left && args.state.pt_dragging
       start_y, start_val = args.state.pt_drag_start
-      delta = (start_y - my).to_f / FADER_H
+      delta = (my - start_y).to_f / FADER_H
       new_val = (start_val + delta).clamp(0.0, 1.0)
       set_track(args, args.state.pt_dragging, new_val)
     end
@@ -438,7 +440,7 @@ module ProgressionTester
       seg_y     = FADER_Y0 + seg * (METER_SEG_H + METER_SEG_GAP)
       # seg 0 = bottom (quiet), seg 15 = top (loud)
       seg_frac  = seg.to_f / METER_SEGS
-      lit       = level >= (1.0 - (seg + 1).to_f / METER_SEGS)
+      lit       = level >= ((seg + 1).to_f / METER_SEGS)
 
       color = if !lit
                 PAL[:led_off]

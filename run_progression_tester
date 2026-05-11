@@ -1,0 +1,14 @@
+#!/bin/sh
+cd "`dirname "$0"`"
+
+cd dragonruby-macos
+
+flag="mygame/tmp/progression_tester_mode"
+mkdir -p mygame/tmp
+touch "$flag"
+trap 'rm -f "$flag"' EXIT INT TERM
+
+./dragonruby mygame
+status=$?
+rm -f "$flag"
+exit $status

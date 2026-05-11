@@ -45,6 +45,9 @@ class Game
 
   EAT_POINTS = [200, 400, 800, 1600].freeze
   EAT_PAUSE_TICKS = 60 # 1s arcade-style freeze on eat
+  DUCK_GAIN_SCALE = 0.55
+  DUCK_RAMP_IN_TICKS = 8
+  DUCK_RAMP_OUT_TICKS = 8
 
   SPAWN_MARKER_TO_IDENTITY = {
     Tiles::SPAWN_BLINKY => :blinky,
@@ -73,6 +76,8 @@ class Game
     @score = 0
     @eat_pause_ticks = 0
     @eat_popup = nil
+    @level_complete = false
+    @audio_state_for = nil
     initialize_player
     initialize_ghosts
   end
@@ -154,13 +159,38 @@ class Game
   end
 
   def tick
+    ensure_audio_state
+    args.state.audio.tick(args)
+    toggle_audio_debug_watch
+
+    if @level_complete
+      args.state.audio.set_duck(args, active: false,
+                                      gain_scale: DUCK_GAIN_SCALE,
+                                      ramp_in: DUCK_RAMP_IN_TICKS,
+                                      ramp_out: DUCK_RAMP_OUT_TICKS)
+      request_reset_if_any_key
+      @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, popup: @eat_popup, level_complete: true)
+      draw_audio_debug_watch if args.state.debug_audio
+      return
+    end
+
     if @eat_pause_ticks > 0
+      args.state.audio.set_duck(args, active: true,
+                                      gain_scale: DUCK_GAIN_SCALE,
+                                      ramp_in: DUCK_RAMP_IN_TICKS,
+                                      ramp_out: DUCK_RAMP_OUT_TICKS)
       @eat_pause_ticks -= 1
       @eat_popup = nil if @eat_pause_ticks == 0
       visible_ghosts = @ghosts.reject { |g| g.state == :eaten }
-      @renderer.draw(outputs, @maze, @pellets, nil, visible_ghosts, popup: @eat_popup)
+      @renderer.draw(outputs, @maze, @pellets, nil, visible_ghosts, popup: @eat_popup, level_complete: false)
+      draw_audio_debug_watch if args.state.debug_audio
       return
     end
+
+    args.state.audio.set_duck(args, active: false,
+                                    gain_scale: DUCK_GAIN_SCALE,
+                                    ramp_in: DUCK_RAMP_IN_TICKS,
+                                    ramp_out: DUCK_RAMP_OUT_TICKS)
 
     tick_phase
     tick_frightened
@@ -176,9 +206,15 @@ class Game
     )
 
     tick_player(world)
+    if check_level_complete
+      @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, popup: @eat_popup, level_complete: true)
+      draw_audio_debug_watch if args.state.debug_audio
+      return
+    end
     tick_ghosts(world)
     tick_collisions
-    @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, popup: @eat_popup)
+    @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, popup: @eat_popup, level_complete: false)
+    draw_audio_debug_watch if args.state.debug_audio
   end
 
   def tick_phase
@@ -253,13 +289,19 @@ class Game
 
   def player_eat_pellets
     @projection.cells_touched(@player.rect).each do |gx, gy|
-      kind = @pellets.at(gx, gy)
-      next unless kind
-      @pellets.eat(gx, gy)
+      entry = @pellets.eat(gx, gy)
+      next unless entry
+
+      kind = entry[:kind]
       @dot_count += 1
       @ticks_since_release = 0
       @score += (kind == :power ? 50 : 10)
-      trigger_frightened if kind == :power
+      if kind == :power
+        args.state.audio.on_power_pellet(args)
+        trigger_frightened
+      else
+        args.state.audio.on_dot_collected(args, entry[:color])
+      end
     end
   end
 
@@ -325,6 +367,7 @@ class Game
   def eat_ghost(ghost)
     points = EAT_POINTS[[@eat_chain, EAT_POINTS.size - 1].min]
     @score += points
+    args.state.audio.on_enemy_eaten(args, sequence: @eat_chain + 1)
     @eat_chain += 1
     ghost.state = :eaten
     ghost.role = Tiles::ROLE_GHOST_EATEN
@@ -367,6 +410,65 @@ class Game
 
   def any_frightened?
     @frightened_ticks > 0
+  end
+
+  def ensure_audio_state
+    args.state.audio ||= Audio::Manager.new(args)
+    audio_id = args.state.audio.object_id
+    return if @audio_state_for == audio_id
+
+    args.state.audio.set_dot_totals(dot_totals_by_track)
+    @audio_state_for = audio_id
+  end
+
+  def dot_totals_by_track
+    totals = Audio::Manager::TRACKS.to_h { |track| [track, 0] }
+
+    @pellets.each_with_color do |_pos, kind, color|
+      next unless kind == :pellet
+      track = Audio::Manager::DOT_COLORS[color]
+      totals[track] += 1 if track
+    end
+
+    totals.transform_values { |count| count > 0 ? count : 1 }
+  end
+
+  def check_level_complete
+    return false if @level_complete || @pellets.remaining != 0
+
+    @level_complete = true
+    args.state.audio.set_duck(args, active: false,
+                                    gain_scale: DUCK_GAIN_SCALE,
+                                    ramp_in: DUCK_RAMP_IN_TICKS,
+                                    ramp_out: DUCK_RAMP_OUT_TICKS)
+    args.state.audio.on_level_complete(args)
+    true
+  end
+
+  def request_reset_if_any_key
+    kb_keys = args.inputs.keyboard.key_down.truthy_keys
+    c1_keys = args.inputs.controller_one.key_down.truthy_keys
+    return if kb_keys.empty? && c1_keys.empty?
+
+    args.state.request_game_reset = true
+  end
+
+  def toggle_audio_debug_watch
+    return unless args.inputs.keyboard.key_down.f3
+
+    args.state.debug_audio = !args.state.debug_audio
+  end
+
+  def draw_audio_debug_watch
+    outputs.labels << {
+      x: 20,
+      y: 700,
+      text: "duck active=#{args.state.audio.duck_active} amount=#{args.state.audio.duck_amount.round(2)} gain=#{args.state.audio.duck_gain_multiplier.round(2)}",
+      size_enum: 1,
+      r: 255,
+      g: 255,
+      b: 0
+    }
   end
 
   def rects_overlap?(a, b)

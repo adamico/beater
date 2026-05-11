@@ -7,14 +7,32 @@ require 'app/audio/track_library.rb'
 require 'app/audio/track_player.rb'
 require 'app/audio/sfx_player.rb'
 require 'app/audio/manager.rb'
-require 'app/game.rb'
+
+PROGRESSION_TESTER_MODE = (
+  File.exist?('mygame/tmp/progression_tester_mode') ||
+  File.exist?('tmp/progression_tester_mode')
+).freeze
+
+require 'tools/progression_tester.rb' if PROGRESSION_TESTER_MODE
+require 'app/game.rb' unless PROGRESSION_TESTER_MODE
 
 def tick args
+  if PROGRESSION_TESTER_MODE
+    ProgressionTester.tick(args)
+    return
+  end
+
   $game ||= Game.new
   $game.args = args
   $game.tick
+
+  if args.state.request_game_reset
+    reset(args)
+  end
 end
 
 def reset args
   $game = nil
+  args.state.audio = nil
+  args.state.request_game_reset = false
 end

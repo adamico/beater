@@ -8,7 +8,14 @@
 class Renderer
   BACKGROUND      = [30, 30, 30].freeze
   WALL_COLOR      = { r: 255, g: 255, b: 255 }.freeze
-  PELLET_COLOR    = { r: 255, g: 200, b: 150 }.freeze
+  PELLET_COLOR_BY_KEY = {
+    red:    { r: 255, g: 90,  b: 90  },
+    green:  { r: 90,  g: 230, b: 120 },
+    blue:   { r: 90,  g: 160, b: 255 },
+    yellow: { r: 255, g: 225, b: 90  },
+  }.freeze
+  PELLET_COLOR_FALLBACK = { r: 255, g: 200, b: 150 }.freeze
+  POWER_PELLET_COLOR = { r: 255, g: 255, b: 255 }.freeze
   POPUP_COLOR     = { r: 100, g: 220, b: 255 }.freeze
   CLIP_BACKGROUND = [0, 0, 0, 0].freeze
 
@@ -19,12 +26,13 @@ class Renderer
     @projection = projection
   end
 
-  def draw(outputs, maze, pellets, player, ghosts = [], popup: nil)
+  def draw(outputs, maze, pellets, player, ghosts = [], popup: nil, level_complete: false)
     outputs.background_color = BACKGROUND
     draw_walls(outputs, maze)
     draw_pellets(outputs, pellets)
     draw_actors(outputs, maze, player, ghosts)
     draw_popup(outputs, popup) if popup
+    level_complete
   end
 
   def draw_popup(outputs, popup)
@@ -44,13 +52,18 @@ class Renderer
 
   def draw_pellets(outputs, pellets)
     solids = []
-    pellets.each do |(gx, gy), kind|
+    pellets.each_with_color do |(gx, gy), kind, color|
       rect = @projection.cell_rect(gx, gy)
       size = kind == :power ? POWER_PELLET_SIZE : PELLET_SIZE
       pad = (@projection.cell_size - size) / 2
+      rgb = if kind == :power
+              POWER_PELLET_COLOR
+            else
+              PELLET_COLOR_BY_KEY[color] || PELLET_COLOR_FALLBACK
+            end
       solids << {
         x: rect[:x] + pad, y: rect[:y] + pad,
-        w: size, h: size, **PELLET_COLOR
+        w: size, h: size, **rgb
       }
     end
     outputs.solids << solids

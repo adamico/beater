@@ -3,7 +3,7 @@ module Audio
     TRACKS     = [:drums, :bass, :lead, :chords].freeze
     DOT_COLORS = { red: :drums, green: :bass, blue: :lead, yellow: :chords }.freeze
 
-    attr_reader :completion
+    attr_reader :completion, :duck_active, :duck_amount, :duck_gain_scale
 
     def initialize(args)
       @definitions  = TrackLibrary.build_all
@@ -18,6 +18,12 @@ module Audio
 
       @last_params = { drums: nil, bass: nil, lead: nil, chords: nil }
 
+      @duck_active     = false
+      @duck_amount     = 0.0
+      @duck_gain_scale = 0.55
+      @duck_ramp_in    = 8
+      @duck_ramp_out   = 8
+
       TRACKS.each do |n|
         @players[n] = TrackPlayer.new(n, @definitions[n], args)
         apply_envelope(n, 0.0)
@@ -25,9 +31,21 @@ module Audio
     end
 
     def tick(args)
+      update_duck_amount
       prune_sfx(args)
       sync_gains(args)
       update_auto_envelopes
+    end
+
+    def set_duck(_args, active:, gain_scale: 0.55, ramp_in: 8, ramp_out: 8)
+      @duck_active     = active
+      @duck_gain_scale = gain_scale
+      @duck_ramp_in    = [ramp_in, 1].max
+      @duck_ramp_out   = [ramp_out, 1].max
+    end
+
+    def duck_gain_multiplier
+      1.0 - @duck_amount * (1.0 - @duck_gain_scale)
     end
 
     def set_dot_totals(totals)
@@ -98,6 +116,23 @@ module Audio
 
     private
 
+    def update_duck_amount
+      target = @duck_active ? 1.0 : 0.0
+      return if @duck_amount == target
+
+      step = if @duck_active
+               1.0 / @duck_ramp_in
+             else
+               1.0 / @duck_ramp_out
+             end
+
+      if @duck_active
+        @duck_amount = [@duck_amount + step, 1.0].min
+      else
+        @duck_amount = [@duck_amount - step, 0.0].max
+      end
+    end
+
     def resolve_track(color_or_track)
       TRACKS.include?(color_or_track) ? color_or_track : DOT_COLORS[color_or_track]
     end
@@ -120,9 +155,9 @@ module Audio
 
     def apply_envelope(track, t)
       cfg                   = @configs[track]
-      cutoff, resonance, _gain = interpolated_params(track, t)
+      cutoff, resonance      = envelope_params_for(track, t)
 
-      if t >= 1.0 && cfg.bypass_at_full?
+      if @duck_amount <= 0.0 && t >= 1.0 && cfg.bypass_at_full?
         @players[track].swap_filter(:none)
       else
         opts = { cutoff: cutoff }
@@ -135,7 +170,8 @@ module Audio
 
     def sync_gains(args)
       TRACKS.each do |n|
-        cutoff, _res, gain = interpolated_params(n, @completion[n])
+        _cutoff, _res, gain = interpolated_params(n, @completion[n])
+        gain *= duck_gain_multiplier
         args.audio[@players[n].track_key]&.tap { |a| a.gain = gain }
       end
     end
@@ -144,8 +180,8 @@ module Audio
       TRACKS.each do |n|
         next if @manual_filter[n]
 
-        t                     = @completion[n]
-        cutoff, resonance, _g = interpolated_params(n, t)
+        t                 = @completion[n]
+        cutoff, resonance = envelope_params_for(n, t)
         new_params            = [cutoff, resonance]
 
         next if @last_params[n] == new_params
@@ -153,7 +189,7 @@ module Audio
         @last_params[n] = new_params
         cfg             = @configs[n]
 
-        if t >= 1.0 && cfg.bypass_at_full?
+        if @duck_amount <= 0.0 && t >= 1.0 && cfg.bypass_at_full?
           @players[n].swap_filter(:none)
         else
           opts = { cutoff: cutoff }
@@ -161,6 +197,23 @@ module Audio
           @players[n].swap_filter(cfg.filter_type, **opts)
         end
       end
+    end
+
+    def envelope_params_for(track, t)
+      cfg                    = @configs[track]
+      base_cutoff, base_res, = interpolated_params(track, t)
+      return [base_cutoff, base_res] if @duck_amount <= 0.0
+
+      duck_cutoff = cfg.start_cutoff.to_f
+      cutoff      = (base_cutoff + @duck_amount * (duck_cutoff - base_cutoff)).round
+
+      resonance = if base_res || cfg.start_resonance
+                    start_res = base_res.nil? ? cfg.start_resonance : base_res
+                    target_res = cfg.start_resonance.nil? ? start_res : cfg.start_resonance
+                    start_res + @duck_amount * (target_res - start_res)
+                  end
+
+      [cutoff, resonance]
     end
 
     def prune_sfx(args)
