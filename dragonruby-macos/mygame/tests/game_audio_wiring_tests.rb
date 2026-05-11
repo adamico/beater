@@ -1,7 +1,7 @@
 require 'app/game.rb'
 
 class FakeState
-  attr_accessor :request_game_reset, :debug_audio, :audio
+  attr_accessor :request_game_reset, :debug_audio, :audio, :sfx_cache, :sfx_counter
 end
 
 class FakeArgs
@@ -237,4 +237,33 @@ def test_tick_duck_inactive_during_normal_play args, assert
   game.tick
 
   assert.true! audio.duck_calls.any? { |call| !call[:active] }
+end
+
+def test_audio_manager_registers_looping_music_stems args, assert
+  audio_args = make_args_with_audio_spy
+  manager = Audio::Manager.new(audio_args)
+
+  assert.equal! manager.filter_type(:drums), :none
+  assert.equal! audio_args.audio[:track_drums][:input], "sounds/music/drums.wav"
+  assert.equal! audio_args.audio[:track_bass][:input], "sounds/music/bass.wav"
+  assert.equal! audio_args.audio[:track_lead][:input], "sounds/music/lead.wav"
+  assert.equal! audio_args.audio[:track_chords][:input], "sounds/music/chords.wav"
+  assert.true! audio_args.audio[:track_drums][:looping]
+  assert.false! audio_args.audio[:track_drums][:paused]
+end
+
+def test_audio_manager_linearly_updates_track_gain_from_completion args, assert
+  audio_args = make_args_with_audio_spy
+  manager = Audio::Manager.new(audio_args)
+
+  manager.set_dot_totals(drums: 4, bass: 1, lead: 1, chords: 1)
+  manager.on_dot_collected(audio_args, :red)
+  manager.tick(audio_args)
+
+  expected_gain = Audio::TRACK_CONFIGS[:drums].start_gain + 0.25 *
+                  (Audio::TRACK_CONFIGS[:drums].end_gain - Audio::TRACK_CONFIGS[:drums].start_gain)
+
+  assert.equal! manager.completion[:drums], 0.25
+  assert.equal! audio_args.audio[:track_drums][:gain], expected_gain
+  assert.true! audio_args.audio.keys.any? { |key| key.to_s.start_with?("sfx_") }
 end

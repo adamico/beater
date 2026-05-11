@@ -1,9 +1,9 @@
 # =============================================================================
 # progression_tester.rb
-# DJ Maze Game — Audio Progression Dev Tool
+# DJ Maze Game — Stem Gain Progression Dev Tool
 #
 # A standalone DragonRuby scene that lets you scrub each track's dot-collection
-# completion % in real time and hear the filter envelope respond immediately.
+# completion % in real time and hear the stem gain progression respond immediately.
 # Run this instead of main.rb during audio tuning.
 #
 # HOW TO USE
@@ -14,7 +14,7 @@
 #      require 'app/progression_tester.rb'
 #      def tick(args) = ProgressionTester.tick(args)
 # 3. Use mouse to drag channel sliders or click the shortcut buttons.
-# 4. Edit TRACK_CONFIGS in audio_manager.rb, hot-reload fires instantly.
+# 4. Edit TRACK_CONFIGS in track_config.rb, hot-reload fires instantly.
 #
 # CONTROLS
 # --------
@@ -24,7 +24,7 @@
 #   [Space]            — randomise all sliders
 #   [1][2][3][4]       — solo that track (mute others)
 #   [S]                — clear solo (all tracks audible)
-#   [R]                — reset AudioManager (re-init filters from scratch)
+#   [R]                — reset AudioManager
 #   [Q] / Escape       — quit tester (return to main game if integrated)
 # =============================================================================
 
@@ -364,23 +364,18 @@ module ProgressionTester
     out.labels << label(sx + STRIP_W / 2, STRIP_Y0 + STRIP_H - 62,
                         pct_text, size: 3, align: 1, **PAL[:led_green])
 
-    # ── Filter info readout ──
-    cutoff, res, gain = interpolated_params_for(cfg, comp)
-    filter_text = cfg.filter_type.to_s.upcase
+    # ── Stem / gain readout ──
+    gain = interpolated_gain_for(cfg, comp)
     out.labels << label(sx + STRIP_W / 2, STRIP_Y0 + STRIP_H - 100,
-                        filter_text, size: -2, align: 1, **PAL[:label])
+                        'LOOPING STEM', size: -2, align: 1, **PAL[:label])
 
-    cutoff_display = cutoff >= 1000 ? "#{"%.1f" % (cutoff / 1000.0)}kHz" : "#{cutoff}Hz"
+    stem_path = Audio::TrackLibrary::STEM_PATHS[track]
+    stem_name = stem_path.split('/').last.to_s.upcase
     out.labels << label(sx + STRIP_W / 2, STRIP_Y0 + STRIP_H - 114,
-                        cutoff_display, size: -2, align: 1, **PAL[:label_bright])
-
-    if res
-      out.labels << label(sx + STRIP_W / 2, STRIP_Y0 + STRIP_H - 128,
-                          "Q #{"%.1f" % res}", size: -2, align: 1, **PAL[:label])
-    end
+                        stem_name, size: -2, align: 1, **PAL[:label_bright])
 
     # ── Gain readout ──
-    out.labels << label(sx + STRIP_W / 2, STRIP_Y0 + STRIP_H - 142,
+    out.labels << label(sx + STRIP_W / 2, STRIP_Y0 + STRIP_H - 128,
                         "GN #{"%.2f" % gain}", size: -2, align: 1, **PAL[:label])
 
     # ── Fader rail ──
@@ -426,10 +421,9 @@ module ProgressionTester
                          'S', size: -1, align: 1,
                          **( solo_lit ? PAL[:bg] : PAL[:label] ))
 
-    # ── Density tier badge ──
-    tier = density_tier(comp)
+    # ── Progression badge ──
     out.labels << label(sx + STRIP_W / 2, STRIP_Y0 + 12,
-                        tier, size: -3, align: 1, **PAL[:label])
+              progression_badge(comp), size: -3, align: 1, **PAL[:label])
   end
 
   def self.render_led_meter(out, idx, level)
@@ -596,22 +590,17 @@ module ProgressionTester
   # Audio / config helpers (mirrors AudioManager private logic for display)
   # ---------------------------------------------------------------------------
 
-  def self.interpolated_params_for(cfg, t)
+  def self.interpolated_gain_for(cfg, t)
     t = t.clamp(0.0, 1.0)
-    end_cutoff = cfg.bypass_at_full? ? 20_000.0 : cfg.end_cutoff.to_f
-    cutoff     = (cfg.start_cutoff + t * (end_cutoff - cfg.start_cutoff)).round
-    gain       = cfg.start_gain + t * (cfg.end_gain - cfg.start_gain)
-    resonance  = cfg.start_resonance &&
-                 cfg.start_resonance + t * (cfg.end_resonance - cfg.start_resonance)
-    [cutoff, resonance, gain]
+    cfg.start_gain + t * (cfg.end_gain - cfg.start_gain)
   end
 
-  def self.density_tier(completion)
+  def self.progression_badge(completion)
     case completion
-    when 0.0...0.25 then 'SPARSE  ·  1 / 4 beats'
-    when 0.25...0.50 then 'MEDIUM  ·  1 / beat'
-    when 0.50...0.75 then 'DENSE   ·  1 / half-beat'
-    else                  'FULL    ·  all steps'
+    when 0.0...0.25 then 'INTRO  ·  LOW GAIN'
+    when 0.25...0.50 then 'BUILD  ·  OPENING'
+    when 0.50...0.75 then 'LIFT   ·  STRONGER'
+    else                  'FULL   ·  MAX GAIN'
     end
   end
 end

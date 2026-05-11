@@ -65,6 +65,12 @@ Adding a new actor mode = add a role + a column. Maze stays dumb.
 
 Agents (Player, future Enemy) consult **Maze** (semantics) + **GridProjection** (geometry).
 
+## Audio
+
+- **Music stems** — four looping `.wav` files (`drums`, `bass`, `lead`, `chords`) registered through `args.audio` at startup. They are the canonical background music source.
+- **Track progression** — each pellet color maps to one music stem. Collecting pellets raises that stem's gain from its configured `start_gain` toward `end_gain`.
+- **Procedural SFX** — gameplay feedback sounds (`dot_tick`, `power_pellet`, `enemy_eaten`, `game_over`) are still synthesized at runtime. Music simplification does not remove procedural SFX.
+
 ## Tunnel
 
 A **Tunnel** is a horizontal corridor whose `_` cells touch column 0 and column `width-1` on the same row. **Wrapping** is the act of crossing the seam: actor walks off one edge and reappears fully on the opposite edge.

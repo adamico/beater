@@ -226,36 +226,25 @@ _Reset counter when invincibility expires or next power pellet is eaten._
 
 **One complete song** (the "victory composition"):
 
-- **Structure**: 4 independent tracks
-  - Track 1: Drums (kick, snare, hi-hat patterns)
-  - Track 2: Bass (low-frequency melodic line)
-  - Track 3: Lead (melody or harmonic pad)
-  - Track 4: Vocals or CHORDS (leads, arpeggios, or ambient sounds)
-- **Length**: 64 steps each (~4 bars at standard BPM)
-- **BPM**: 120 BPM (or your preference; keep it consistent)
-- **Key**: All tracks in the same key (e.g., C major or A minor) so they harmonize
+- **Structure**: 4 independent looping stem files
+  - Track 1: Drums stem
+  - Track 2: Bass stem
+  - Track 3: Lead stem
+  - Track 4: Chords stem
+- **Format**: `.wav`
 - **Looping**: All tracks loop continuously during gameplay
+- **Synchronization**: All four stems must be exported at the same length so they stay aligned
 
-### Progressive Unmuting Logic
+### Progressive Gain Logic
 
 **Pseudo-code for each track:**
 
 ```
 completion_percent = collected_dots_of_color / total_dots_of_color
-
-if completion_percent < 0.25:
-  mute all steps except every 4th (play 1 note per 2 beats, very sparse)
-elif completion_percent < 0.50:
-  mute all steps except every 2nd (play more notes each beat)
-elif completion_percent < 0.75:
-  apply low-pass filter (reduce high frequencies, muffled sound)
-  play all steps but filtered
-else:
-  no muting, no filtering
-  play all notes at full clarity and volume
+gain = start_gain + completion_percent * (end_gain - start_gain)
 ```
 
-**Implementation detail**: Mute at the _step level_, not the note level. A 64-step track means you have 64 audio segments; mute or unmute entire segments based on the above thresholds.
+**Implementation detail**: Dot collection still maps by color to one track, but progression now changes track gain only. Music stems are pre-rendered; they are not generated note-by-note at runtime.
 
 ### Sound Effects (SFX)
 
@@ -267,19 +256,20 @@ else:
 | Game over              | Sad trombone or filter-swept downward | ~1s       | Negative reinforcement                         |
 | Level complete         | (Main track plays at full clarity)    | Full loop | Positive reinforcement                         |
 
-### Audio Implementation (Web-based)
+SFX remain procedurally generated for now. The music simplification only removes runtime note generation for the background tracks.
 
-- **Library**: Use Web Audio API or Tone.js (Tone.js recommended for easier timing/scheduling)
-- **Format**: Load tracks as `.wav` or `.ogg` (avoid lossy MP3 for sample-accurate sync)
-- **Playback**: Load all 4 tracks as audio buffers; loop them continuously
-- **Muting**: Use `GainNode.gain.value` to fade tracks (smoother than stop/restart)
-- **Filtering**: Use `BiquadFilterNode` for low-pass filter effect (50–75% collection state)
-- **Synchronization**: All tracks share a single master clock/beat clock so they stay in sync
+### Audio Implementation
+
+- **Runtime**: DragonRuby `args.audio`
+- **Format**: Load the 4 music tracks from `.wav` files
+- **Playback**: Register all 4 stems as looping audio sources at startup
+- **Progression**: Update `gain` on each registered music source as dots are collected
+- **SFX**: Procedural generation remains valid for gameplay feedback sounds
 
 ### Audio Sync Considerations
 
 - **Tight sync required**: All 4 tracks must stay locked together (no drift)
-- **Solution**: Use a frame-based or beat-based clock; schedule all audio events from this clock
+- **Solution**: Start the 4 looping stems together and keep them running; only gain changes during play
 - **Test**: Listen for any drift after 1–2 minutes of play; adjust if necessary
 
 ---
