@@ -1,6 +1,7 @@
 module Audio
   class TrackPlayer
     attr_reader :track_key, :completion, :filter_type, :backend
+    DEFAULT_STREAM_SAMPLE_RATE = MusicTheory::SAMPLE_RATE
 
     def initialize(track_name, definition, args, backend: :legacy)
       @track_name  = track_name
@@ -9,6 +10,7 @@ module Audio
       @completion  = 0.0
       @filter_type = :none
       @backend     = backend
+      @stream_sample_rate = self.class.detect_wav_sample_rate(@definition.input_path) || DEFAULT_STREAM_SAMPLE_RATE
       @last_native_params = nil
       @last_output_gain = nil
 
@@ -65,6 +67,36 @@ module Audio
 
     private
 
+    def self.detect_wav_sample_rate(path)
+      return nil unless path
+      candidates = [
+        path,
+        File.join("mygame", path)
+      ]
+
+      candidates.each do |candidate|
+        begin
+          bytes = if File.respond_to?(:binread)
+                    File.binread(candidate)
+                  else
+                    File.read(candidate)
+                  end
+          next unless bytes
+
+          header = bytes[0, 44]
+          next unless header && header.bytesize >= 28
+          next unless header[0, 4] == "RIFF" && header[8, 4] == "WAVE"
+
+          sample_rate = header[24, 4].unpack("V")[0]
+          return sample_rate if sample_rate && sample_rate > 0
+        rescue StandardError
+          next
+        end
+      end
+
+      nil
+    end
+
     def same_native_params?(a, b)
       return false unless a
 
@@ -99,10 +131,10 @@ module Audio
       offset_frames = 0
       # DragonRuby recommends procedural callbacks return at least 0.1s-0.5s of audio
       # per call to avoid skips/clicks; use 0.25s as a stable middle ground.
-      frame_count = (MusicTheory::SAMPLE_RATE * 0.25).ceil
+      frame_count = (@stream_sample_rate * 0.25).ceil
 
       args.audio[@track_key] = {
-        input: [2, MusicTheory::SAMPLE_RATE, lambda {
+        input: [2, @stream_sample_rate, lambda {
           chunk = NativeBridge.next_chunk(
             track_name: @track_name,
             input_path: @definition.input_path,

@@ -91,6 +91,13 @@ Agents (Player, future Enemy) consult **Maze** (semantics) + **GridProjection** 
 - **Queued SFX staleness** — queued rhythmic SFX expires if it is more than one beat step late; stale events are dropped.
 - **Beat indicator** — gameplay shows an always-on subtle beat pulse to communicate timing boundaries.
 - **Commit anticipation animation** — player always shows squash/stretch wind-up during commit ramp to signal locked timing.
+- **Orthogonal turn ramp** — side inputs begin ramp immediately, then snap to the first legal turn cell center.
+- **Orthogonal turn quantization** — if the orthogonal ramp reaches a beat boundary early, the actual turn still snaps on that next boundary.
+- **Orthogonal grace window** — orthogonal turns use a tighter grace window than forward commits.
+- **Orthogonal grace default** — 1 frame.
+- **Held orthogonal intent** — while orthogonal input is held, turn scheduling retries at each legal intersection until applied.
+- **Orthogonal pending timeout** — none; pending orthogonal intent remains active as long as input is held.
+- **Orthogonal legal-turn priority** — when a held orthogonal turn becomes legal at an intersection, it applies immediately even outside beat grace.
 - **Timing tuning scope** — grace window, ramp curve, and ramp duration scaling are per-level settings with global defaults.
 - **Ghost tempo coupling** — ghost speeds remain state ratios of player speed, and player speed is BPM-derived.
 - **Beat subdivision** — rhythmic step boundaries are fixed at 16th-note resolution for MVP.

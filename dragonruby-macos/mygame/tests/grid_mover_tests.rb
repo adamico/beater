@@ -89,6 +89,18 @@ def test_try_turn_perpendicular_into_wall_fails args, assert
   assert.equal! actor.direction, Direction::UP
 end
 
+def test_try_turn_perpendicular_snaps_near_center_with_fractional_speed args, assert
+  maze, projection = fresh_world
+  # Horizontal travel with fractional speed can miss exact center by sub-pixel drift.
+  # When close enough to the centerline, turning should snap and succeed.
+  actor = TestActor.new(x: 58.8, y: 40, w: 20, h: 20, speed: (4.0 / 3.0), direction: Direction::RIGHT)
+  result = actor.try_turn(Direction::UP, maze, projection)
+
+  assert.true! result
+  assert.equal! actor.direction, Direction::UP
+  assert.equal! actor.x, 60
+end
+
 def test_advance_none_does_not_move args, assert
   maze, projection = fresh_world
   actor = actor_at_center(direction: Direction::NONE)

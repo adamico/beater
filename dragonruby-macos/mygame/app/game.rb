@@ -10,18 +10,27 @@ require 'app/ghost.rb'
 require 'app/ghost_controllers.rb'
 require 'app/world.rb'
 require 'app/renderer.rb'
+require 'app/audio/beat_clock.rb'
 require 'data/maps/pacman_layout.rb'
 
 class Game
   attr_dr
 
+  LEVEL_BPM = 120
+  CELLS_PER_BEAT = 2.0
+
   CELL_SIZE = 20
   OFFSET_X = CELL_SIZE * 16
   OFFSET_Y = CELL_SIZE * 2
-  PLAYER_SPEED = 2
+  FRAMES_PER_BEAT = (Audio::BeatClock::FPS * 60.0) / LEVEL_BPM
+  FRAMES_PER_CELL = FRAMES_PER_BEAT / CELLS_PER_BEAT
+  PLAYER_SPEED = CELL_SIZE / FRAMES_PER_CELL
 
-  GHOST_SPEED            = 2
-  GHOST_FRIGHTENED_SPEED = 1
+  GHOST_SPEED_RATIO = 0.75
+  GHOST_FRIGHTENED_RATIO = 0.5
+
+  GHOST_SPEED            = PLAYER_SPEED * GHOST_SPEED_RATIO
+  GHOST_FRIGHTENED_SPEED = PLAYER_SPEED * GHOST_FRIGHTENED_RATIO
   FRIGHTENED_DURATION_TICKS = 600 # 10s @ 60fps
 
   PHASE_TABLE = [
@@ -51,6 +60,8 @@ class Game
   DUCK_GAIN_SCALE = 0.4
   DUCK_RAMP_IN_TICKS = 1
   DUCK_RAMP_OUT_TICKS = 2
+
+  STEP_INPUT_GRACE_TICKS = 3
 
   SPAWN_MARKER_TO_IDENTITY = {
     Tiles::SPAWN_BLINKY => :blinky,
@@ -102,6 +113,11 @@ class Game
       speed: PLAYER_SPEED,
       controller: KeyboardController.new,
       direction: Direction::RIGHT
+    )
+    @player.configure_rhythm(
+      enabled: true,
+      bpm: LEVEL_BPM,
+      grace_ticks: STEP_INPUT_GRACE_TICKS
     )
   end
 
@@ -283,8 +299,12 @@ class Game
 
   def tick_player(world)
     intent = @player.controller.next_direction(world)
-    @player.try_turn(intent, @maze, @projection)
-    @player.advance(@maze, @projection)
+    @player.update_with_rhythm(
+      tick_count: args.tick_count,
+      intent: intent,
+      maze: @maze,
+      projection: @projection
+    )
     player_eat_pellets
   end
 
@@ -488,6 +508,7 @@ class Game
     return if @audio_state_for == audio_id
 
     args.state.audio.set_dot_totals(dot_totals_by_track)
+    args.state.audio.set_rhythm_bpm(LEVEL_BPM) if args.state.audio.respond_to?(:set_rhythm_bpm)
     @audio_state_for = audio_id
   end
 

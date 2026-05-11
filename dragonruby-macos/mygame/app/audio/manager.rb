@@ -1,4 +1,5 @@
 require 'app/audio/native_bridge.rb'
+require 'app/audio/beat_clock.rb'
 
 module Audio
   class Manager
@@ -24,6 +25,10 @@ module Audio
       @duck_ramp_in_ticks = 8
       @duck_ramp_out_ticks = 8
       @backend_mode    = NativeBridge.backend_mode
+      @rhythm_bpm      = BeatClock::DEFAULT_BPM
+      @rhythm_sfx_bpm  = @rhythm_bpm / 2.0
+      @pending_dot_tick = false
+      @pending_power_pellet = false
 
       NativeBridge.load_stems(@definitions) if @backend_mode == :native
 
@@ -36,6 +41,12 @@ module Audio
       prune_sfx(args)
       advance_duck_amount
       sync_gains(args)
+      flush_rhythmic_sfx(args)
+    end
+
+    def set_rhythm_bpm(bpm)
+      @rhythm_bpm = bpm.to_f
+      @rhythm_sfx_bpm = @rhythm_bpm / 2.0
     end
 
     def set_duck(_args, active:, gain_scale: 0.55, ramp_in: 8, ramp_out: 8, immediate: false)
@@ -70,11 +81,11 @@ module Audio
       ratio              = (@dot_counts[track].to_f / @dot_totals[track]).clamp(0.0, 1.0)
       @completion[track] = ratio
       @players[track].update_completion(ratio)
-      SFXPlayer.play(args, :dot_tick)
+      @pending_dot_tick = true
     end
 
     def on_power_pellet(args)
-      SFXPlayer.play(args, :power_pellet)
+      @pending_power_pellet = true
     end
 
     def on_enemy_eaten(args, sequence: 1)
@@ -175,6 +186,19 @@ module Audio
       else
         step = 1.0 / @duck_ramp_out_ticks
         @duck_amount = [@duck_amount - step, 0.0].max
+      end
+    end
+
+    def flush_rhythmic_sfx(args)
+      return unless BeatClock.step_changed?(args.tick_count, bpm: @rhythm_sfx_bpm)
+
+      if @pending_power_pellet
+        SFXPlayer.play(args, :power_pellet)
+        @pending_power_pellet = false
+        @pending_dot_tick = false
+      elsif @pending_dot_tick
+        SFXPlayer.play(args, :dot_tick)
+        @pending_dot_tick = false
       end
     end
   end

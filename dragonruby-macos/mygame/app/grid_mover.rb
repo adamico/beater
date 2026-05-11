@@ -17,6 +17,7 @@ require 'app/tiles.rb'
 
 module GridMover
   attr_accessor :x, :y, :w, :h, :dx, :dy, :speed, :direction, :role
+  AXIS_SNAP_EPSILON = 0.0001
 
   def init_grid_mover(x:, y:, w:, h:, speed:, direction: Direction::NONE, role: Tiles::ROLE_DEFAULT)
     @x = x
@@ -34,15 +35,41 @@ module GridMover
     return false if direction.none?
     return true  if direction == @direction
 
-    if direction != @direction.opposite
-      probe = { x: @x + direction.dx, y: @y + direction.dy, w: @w, h: @h }
-      cells = projection.cells_touched(probe)
-      return false unless cells.length == 2
-      return false unless cells.all? { |(gx, gy)| maze.walkable?(gx, gy, role: @role) }
+    if turn_possible?(direction, maze, projection)
+      face direction
+      return true
     end
 
-    face direction
-    true
+    return false unless perpendicular_to_current?(direction)
+
+    snapped = snapped_position_for(direction, projection)
+    return false unless snapped
+
+    original_x = @x
+    original_y = @y
+    @x = snapped[:x]
+    @y = snapped[:y]
+
+    if turn_possible?(direction, maze, projection)
+      face direction
+      true
+    else
+      @x = original_x
+      @y = original_y
+      false
+    end
+  end
+
+  def turn_possible?(direction, maze, projection)
+    return false if direction.none?
+    return true  if direction == @direction
+    return true  if direction == @direction.opposite
+
+    probe = { x: @x + direction.dx, y: @y + direction.dy, w: @w, h: @h }
+    cells = projection.cells_touched(probe)
+    return false unless cells.length == 2
+
+    cells.all? { |(gx, gy)| maze.walkable?(gx, gy, role: @role) }
   end
 
   def advance(maze, projection)
@@ -76,6 +103,33 @@ module GridMover
 
   def blocked_by_wall?(maze, projection)
     projection.cells_touched(rect).any? { |(gx, gy)| !maze.walkable?(gx, gy, role: @role) }
+  end
+
+  def perpendicular_to_current?(direction)
+    return false if @direction.none?
+    return false if direction == @direction || direction == @direction.opposite
+
+    (direction.vertical? && @direction.horizontal?) ||
+      (direction.horizontal? && @direction.vertical?)
+  end
+
+  def snapped_position_for(direction, projection)
+    return nil unless perpendicular_to_current?(direction)
+
+    snap_tolerance = @speed.to_f + AXIS_SNAP_EPSILON
+    cs = projection.cell_size
+
+    if direction.vertical?
+      target_x = (((@x - projection.offset_x).to_f / cs).round * cs) + projection.offset_x
+      return nil unless (@x - target_x).abs <= snap_tolerance
+
+      { x: target_x, y: @y }
+    else
+      target_y = (((@y - projection.offset_y).to_f / cs).round * cs) + projection.offset_y
+      return nil unless (@y - target_y).abs <= snap_tolerance
+
+      { x: @x, y: target_y }
+    end
   end
 
   # True when the rect is exactly aligned to a single grid cell.
