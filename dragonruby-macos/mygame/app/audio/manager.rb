@@ -119,16 +119,17 @@ module Audio
       t   = t.clamp(0.0, 1.0)
 
       cutoff_hz = interpolated_cutoff_hz(cfg, t)
+      gain = cfg.start_gain + t * (cfg.end_gain - cfg.start_gain)
 
-      [cutoff_hz]
+      [cutoff_hz, gain]
     end
 
     def sync_gains(args)
       TRACKS.each do |n|
-        cutoff_hz = interpolated_params(n, @completion[n]).first
+        cutoff_hz, gain = interpolated_params(n, @completion[n])
         @players[n].apply_mix_settings(
           args,
-          gain: 1.0,
+          gain: gain,
           cutoff_hz: cutoff_hz,
           resonance: nil,
           duck_multiplier: duck_gain_multiplier,

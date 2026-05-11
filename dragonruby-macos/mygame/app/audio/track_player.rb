@@ -32,7 +32,7 @@ module Audio
     end
 
     def apply_mix_settings(args, gain:, cutoff_hz:, resonance:, duck_multiplier:, bypass_mix:)
-      final_gain = duck_multiplier.to_f.clamp(0.0, 1.2)
+      final_gain = (gain.to_f * duck_multiplier.to_f).clamp(0.0, 1.2)
 
       # For procedural streams, changing gain while playing can cause clicks.
       # Keep native stream gain stable; only legacy/file playback uses this path.
@@ -46,7 +46,7 @@ module Audio
       current_params = {
         cutoff_hz: cutoff_hz ? cutoff_hz.to_f : nil,
         resonance: resonance ? resonance.to_f : nil,
-        gain: 1.0,
+        gain: final_gain,
         bypass_mix: 1.0,
       }
 

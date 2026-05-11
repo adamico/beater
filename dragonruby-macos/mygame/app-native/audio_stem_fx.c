@@ -335,7 +335,7 @@ static mrb_value ffi_configure_track(mrb_state *mrb, mrb_value self) {
 
   /* Lowpass-only simplified mode: fixed Q and unity gain. */
   track->resonance = 0.707f;
-  track->gain = 1.0f;
+  track->gain = gain >= 0 ? (float)gain : 1.0f;
   track->bypass_mix = 1.0f;
   biquad_lowpass(track->cutoff_hz, track->resonance, &track->biquad);
 
