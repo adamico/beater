@@ -2,6 +2,7 @@
 require 'app/direction.rb'
 require 'app/grid_mover.rb'
 require 'app/tiles.rb'
+require 'app/ghost_controllers.rb'
 
 class Ghost
   include GridMover
@@ -63,5 +64,22 @@ class Ghost
     # Inside warning window: alternate every FRIGHTENED_FLASH_PERIOD ticks.
     flash_on = (@frightened_remaining_ticks.to_i / FRIGHTENED_FLASH_PERIOD) % 2 > 1
     flash_on ? SPRITES[:frightened_flash] : SPRITES[:frightened]
+  end
+
+  def update(intent:, maze:, projection:)
+    speed_tol = speed.to_f + GhostControllers::DECISION_EPSILON
+
+    old_x = @x
+    old_y = @y
+    try_turn(intent, maze, projection) unless intent.none?
+    advance(maze, projection)
+
+    # If movement was rolled back by collision and we're near a cell center,
+    # snap to the center so transition/turn logic can progress on next tick.
+    if (@x - old_x).abs <= GhostControllers::DECISION_EPSILON &&
+       (@y - old_y).abs <= GhostControllers::DECISION_EPSILON &&
+       at_cell_center?(projection, tolerance: speed_tol)
+      snap_to_cell_center!(projection)
+    end
   end
 end

@@ -1,15 +1,22 @@
 # app/ghost_controllers.rb
 #
-# Per-personality ghost controllers + frightened + eaten. All decisions taken
-# at intersections (cell-center + ≥2 non-reverse walkable exits); else NONE so
-# GridMover keeps current direction. Reverse excluded from candidates.
+# Per-personality ghost controllers + frightened + eaten. Decisions are taken
+# near intersections (within one movement step of cell center) so ghosts are
+# not constrained by exact center hits.
 
 require 'app/direction.rb'
 
 module GhostControllers
+  DECISION_EPSILON = 0.0001
+
+  def self.at_decision_point?(ghost, projection)
+    speed_tol = ghost.respond_to?(:speed) ? ghost.speed.to_f : 0.0
+    ghost.at_cell_center?(projection, tolerance: speed_tol + DECISION_EPSILON)
+  end
+
   module Targeting
     def self.next_direction(ghost, world, target_tile)
-      return Direction::NONE unless ghost.at_cell_center?(world.projection)
+      return Direction::NONE unless GhostControllers.at_decision_point?(ghost, world.projection)
 
       gx, gy = ghost.grid_cell(world.projection)
       candidates = Direction::ALL_MOVING.reject { |d| d == ghost.direction.opposite }
@@ -117,11 +124,24 @@ module GhostControllers
 
   class Frightened
     def next_direction(world, ghost)
-      return Direction::NONE unless ghost.at_cell_center?(world.projection)
+      return Direction::NONE unless GhostControllers.at_decision_point?(ghost, world.projection)
       gx, gy = ghost.grid_cell(world.projection)
+      # Prefer non-reverse walkable directions
       candidates = Direction::ALL_MOVING.reject { |d| d == ghost.direction.opposite }
       walkable = candidates.select { |d| world.maze.walkable?(gx + d.dx, gy + d.dy, role: ghost.role) }
-      walkable.empty? ? ghost.direction.opposite : walkable.sample
+      if !walkable.empty?
+        return walkable.sample
+      end
+      # If no non-reverse walkable, try reverse if it's walkable
+      reverse = ghost.direction.opposite
+      if world.maze.walkable?(gx + reverse.dx, gy + reverse.dy, role: ghost.role)
+        return reverse
+      end
+      # As a last resort, try any walkable direction (including reverse)
+      all_walkable = Direction::ALL_MOVING.select { |d| world.maze.walkable?(gx + d.dx, gy + d.dy, role: ghost.role) }
+      return all_walkable.sample unless all_walkable.empty?
+      # Truly stuck: surrounded by walls
+      Direction::NONE
     end
   end
 
@@ -131,7 +151,7 @@ module GhostControllers
   # behavior and what gives each ghost its character.
   module BFSTargeting
     def self.next_direction(ghost, world, target_cell)
-      return Direction::NONE unless ghost.at_cell_center?(world.projection)
+      return Direction::NONE unless GhostControllers.at_decision_point?(ghost, world.projection)
       start = ghost.grid_cell(world.projection)
       return Direction::NONE if start == target_cell
 

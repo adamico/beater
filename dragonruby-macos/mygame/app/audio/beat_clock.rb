@@ -3,7 +3,7 @@ module Audio
     STEPS_PER_LOOP = 64
     STEPS_PER_BEAT = 4.0
     FPS = 60.0
-    DEFAULT_BPM = 120.0
+    DEFAULT_BPM = 128.0
 
     def self.frames_per_step(bpm: DEFAULT_BPM)
       (FPS * 60.0) / (bpm.to_f * STEPS_PER_BEAT)

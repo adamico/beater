@@ -165,3 +165,13 @@ def test_advance_into_wall_rolls_back args, assert
   actor.advance(maze, projection)
   assert.equal! actor.y, 60
 end
+
+def test_at_cell_center_tolerance_and_snap_with_fractional_speed args, assert
+  maze, projection = fresh_world
+  actor = TestActor.new(x: 59.99995, y: 40.00002, w: 20, h: 20, speed: (2.0 / 3.0), direction: Direction::RIGHT)
+
+  assert.true! actor.at_cell_center?(projection)
+  actor.snap_to_cell_center!(projection)
+  assert.equal! actor.x, 60
+  assert.equal! actor.y, 40
+end

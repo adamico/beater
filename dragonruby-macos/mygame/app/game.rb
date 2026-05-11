@@ -16,7 +16,7 @@ require 'data/maps/pacman_layout.rb'
 class Game
   attr_dr
 
-  LEVEL_BPM = 120
+  LEVEL_BPM = 128
   CELLS_PER_BEAT = 2.0
 
   CELL_SIZE = 20
@@ -26,7 +26,7 @@ class Game
   FRAMES_PER_CELL = FRAMES_PER_BEAT / CELLS_PER_BEAT
   PLAYER_SPEED = CELL_SIZE / FRAMES_PER_CELL
 
-  GHOST_SPEED_RATIO = 0.75
+  GHOST_SPEED_RATIO = 1.1
   GHOST_FRIGHTENED_RATIO = 0.5
 
   GHOST_SPEED            = PLAYER_SPEED * GHOST_SPEED_RATIO
@@ -347,29 +347,32 @@ class Game
       next unless g.controller
 
       intent = g.controller.next_direction(world, g)
-      g.try_turn(intent, @maze, @projection) unless intent.none?
-      g.advance(@maze, @projection)
+      g.update(intent: intent, maze: @maze, projection: @projection)
     end
   end
 
   def handle_ghost_state_transitions(ghost)
-    return unless ghost.at_cell_center?(@projection)
-    cell = ghost.grid_cell(@projection)
-
     case ghost.state
     when :eaten
-      if cell == ghost.spawn_cell
-        # Reached home — flip to leaving so it walks back out the door.
-        start_leaving_house(ghost)
-      end
+      transition_at_cell_center(ghost, ghost.spawn_cell) { start_leaving_house(ghost) }
     when :leaving_house
-      if cell == @above_door_cell
+      transition_at_cell_center(ghost, @above_door_cell) do
         ghost.state = current_phase_mode
         ghost.role = Tiles::ROLE_DEFAULT
         ghost.controller = GhostControllers.for(ghost.identity)
         ghost.speed = ghost.base_speed
       end
     end
+  end
+
+  def transition_at_cell_center(ghost, target_cell)
+    return unless ghost.grid_cell(@projection) == target_cell
+
+    tol = ghost.speed.to_f + GhostControllers::DECISION_EPSILON
+    return unless ghost.at_cell_center?(@projection, tolerance: tol)
+
+    ghost.snap_to_cell_center!(@projection)
+    yield
   end
 
   def tick_collisions

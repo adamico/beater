@@ -134,14 +134,31 @@ module GridMover
 
   # True when the rect is exactly aligned to a single grid cell.
   # Ghost controllers use this to take decisions only at intersections.
-  def at_cell_center?(projection)
+  def at_cell_center?(projection, tolerance: nil)
+    tol = tolerance.nil? ? AXIS_SNAP_EPSILON : tolerance.to_f
+    dx_err, dy_err = cell_center_error(projection)
+    dx_err <= tol && dy_err <= tol
+  end
+
+  def snap_to_cell_center!(projection)
     cs = projection.cell_size
-    ((@x - projection.offset_x) % cs == 0) && ((@y - projection.offset_y) % cs == 0)
+    @x = ((@x - projection.offset_x) / cs).round * cs + projection.offset_x
+    @y = ((@y - projection.offset_y) / cs).round * cs + projection.offset_y
   end
 
   # Grid coords of the cell the rect is anchored to.
   def grid_cell(projection)
     cs = projection.cell_size
     [((@x - projection.offset_x) / cs).floor, ((@y - projection.offset_y) / cs).floor]
+  end
+
+  def cell_center_error(projection)
+    cs = projection.cell_size.to_f
+    x_cells = (@x - projection.offset_x).to_f / cs
+    y_cells = (@y - projection.offset_y).to_f / cs
+    [
+      (x_cells - x_cells.round).abs * cs,
+      (y_cells - y_cells.round).abs * cs
+    ]
   end
 end
