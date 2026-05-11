@@ -2,3 +2,4 @@
 dragonruby-macos/mygame/errors/last.txt
 dragonruby-macos/logs/
 dragonruby-macos/tmp/
+dragonruby-macos/mygame/native/**/*.dylib

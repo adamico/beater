@@ -329,6 +329,11 @@ module ProgressionTester
                         'DRAG FADERS  ·  [0] ZERO  [F] FULL  [SPACE] RANDOM  ' \
                         '[1-4] SOLO  [S] UNSOLO  [R] RESET',
                         size: -3, align: 1, **PAL[:label])
+
+    backend_text = args.state.audio&.respond_to?(:backend_mode) ? args.state.audio.backend_mode.to_s.upcase : 'UNKNOWN'
+    out.labels << label(SCREEN_W - 20, SCREEN_H - 20,
+              "BACKEND: #{backend_text}",
+              size: -3, align: 2, **PAL[:label_bright])
   end
 
   def self.render_strip(args, out, track, idx)

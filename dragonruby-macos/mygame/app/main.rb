@@ -4,6 +4,7 @@ require 'app/audio/filters.rb'
 require 'app/audio/track_config.rb'
 require 'app/audio/beat_clock.rb'
 require 'app/audio/track_library.rb'
+require 'app/audio/native_bridge.rb'
 require 'app/audio/track_player.rb'
 require 'app/audio/sfx_player.rb'
 require 'app/audio/manager.rb'
@@ -33,6 +34,7 @@ end
 
 def reset args
   $game = nil
+  Audio::NativeBridge.reset_runtime_state!
   args.state.audio = nil
   args.state.request_game_reset = false
 end

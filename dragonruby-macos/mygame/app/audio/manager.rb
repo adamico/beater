@@ -1,9 +1,13 @@
+require 'app/audio/native_bridge.rb'
+
 module Audio
   class Manager
     TRACKS     = [:drums, :bass, :lead, :chords].freeze
     DOT_COLORS = { red: :drums, green: :bass, blue: :lead, yellow: :chords }.freeze
+    MIN_CUTOFF_HZ = 20.0
+    MAX_CUTOFF_HZ = 20_000.0
 
-    attr_reader :completion, :duck_active, :duck_amount, :duck_gain_scale
+    attr_reader :completion, :duck_active, :duck_amount, :duck_gain_scale, :backend_mode
 
     def initialize(args)
       @definitions  = TrackLibrary.build_all
@@ -17,9 +21,10 @@ module Audio
       @duck_active     = false
       @duck_amount     = 0.0
       @duck_gain_scale = 1.0
+      @backend_mode    = NativeBridge.backend_mode
 
       TRACKS.each do |n|
-        @players[n] = TrackPlayer.new(n, @definitions[n], args)
+        @players[n] = TrackPlayer.new(n, @definitions[n], args, backend: @backend_mode)
       end
     end
 
@@ -36,6 +41,10 @@ module Audio
 
     def duck_gain_multiplier
       1.0
+    end
+
+    def using_native_backend?
+      @backend_mode == :native
     end
 
     def set_dot_totals(totals)
@@ -108,14 +117,47 @@ module Audio
       t   = t.clamp(0.0, 1.0)
 
       gain = cfg.start_gain + t * (cfg.end_gain - cfg.start_gain)
-      [nil, nil, gain]
+
+      cutoff_hz = interpolated_cutoff_hz(cfg, t)
+      resonance = interpolated_resonance(cfg, t)
+      bypass_mix = cfg.bypass_at_full? ? t : 0.0
+
+      [cutoff_hz, resonance, gain, bypass_mix]
     end
 
     def sync_gains(args)
       TRACKS.each do |n|
-        _cutoff, _res, gain = interpolated_params(n, @completion[n])
-        args.audio[@players[n].track_key]&.tap { |a| a.gain = gain }
+        cutoff_hz, resonance, gain, bypass_mix = interpolated_params(n, @completion[n])
+        @players[n].apply_mix_settings(
+          args,
+          gain: gain,
+          cutoff_hz: cutoff_hz,
+          resonance: resonance,
+          duck_multiplier: duck_gain_multiplier,
+          bypass_mix: bypass_mix
+        )
       end
+    end
+
+    def interpolated_cutoff_hz(cfg, t)
+      return nil unless cfg.start_cutoff.is_a?(Numeric)
+
+      end_cutoff = cfg.end_cutoff == :bypass ? cfg.start_cutoff : cfg.end_cutoff
+      return nil unless end_cutoff.is_a?(Numeric)
+
+      start_hz = cfg.start_cutoff.to_f.clamp(MIN_CUTOFF_HZ, MAX_CUTOFF_HZ)
+      end_hz = end_cutoff.to_f.clamp(MIN_CUTOFF_HZ, MAX_CUTOFF_HZ)
+      return start_hz if start_hz == end_hz
+
+      start_ln = Math.log(start_hz)
+      end_ln = Math.log(end_hz)
+      Math.exp(start_ln + t * (end_ln - start_ln))
+    end
+
+    def interpolated_resonance(cfg, t)
+      return nil unless cfg.start_resonance.is_a?(Numeric) && cfg.end_resonance.is_a?(Numeric)
+
+      cfg.start_resonance + t * (cfg.end_resonance - cfg.start_resonance)
     end
 
     def prune_sfx(args)
