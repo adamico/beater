@@ -1,5 +1,6 @@
 require 'app/audio/native_bridge.rb'
 require 'app/audio/beat_clock.rb'
+require 'app/audio/duck_controller.rb'
 
 module Audio
   class Manager
@@ -13,7 +14,12 @@ module Audio
     EAT_DUCK_RAMP_OUT    = 2
     EAT_FREEZE_HOLD_TICKS = 45 # 0.75 * 60-tick freeze
 
-    attr_reader :completion, :duck_active, :duck_amount, :duck_gain_scale, :backend_mode
+    attr_reader :completion, :backend_mode
+
+    def duck_active = @duck.active?
+    def duck_amount = @duck.amount
+    def duck_gain_scale = @duck.gain_scale
+    def duck_gain_multiplier = @duck.gain_multiplier
 
     def initialize(args)
       @definitions  = TrackLibrary.build_all
@@ -24,11 +30,7 @@ module Audio
 
       @configs = TRACK_CONFIGS.transform_values(&:dup)
 
-      @duck_active     = false
-      @duck_amount     = 0.0
-      @duck_gain_scale = 1.0
-      @duck_ramp_in_ticks = 8
-      @duck_ramp_out_ticks = 8
+      @duck            = DuckController.new
       @backend_mode    = NativeBridge.backend_mode
       @rhythm_bpm      = BeatClock::DEFAULT_BPM
       @rhythm_sfx_bpm  = @rhythm_bpm / 2.0
@@ -46,7 +48,7 @@ module Audio
 
     def tick(args)
       prune_sfx(args)
-      advance_duck_amount
+      @duck.tick
       sync_gains(args)
       flush_rhythmic_sfx(args)
     end
@@ -56,20 +58,8 @@ module Audio
       @rhythm_sfx_bpm = @rhythm_bpm / 2.0
     end
 
-    def set_duck(_args, active:, gain_scale: 0.55, ramp_in: 8, ramp_out: 8, immediate: false)
-      was_active = @duck_active
-      @duck_active     = active
-      @duck_gain_scale = gain_scale
-      @duck_ramp_in_ticks = [ramp_in.to_i, 1].max
-      @duck_ramp_out_ticks = [ramp_out.to_i, 1].max
-
-      if immediate && active && !was_active
-        @duck_amount = 1.0
-      end
-    end
-
-    def duck_gain_multiplier
-      (1.0 - @duck_amount * (1.0 - @duck_gain_scale)).clamp(0.0, 1.0)
+    def set_duck(_args, **kwargs)
+      @duck.set(**kwargs)
     end
 
     def using_native_backend?
@@ -135,7 +125,7 @@ module Audio
                        gain_scale: EAT_DUCK_GAIN_SCALE,
                        ramp_in: EAT_DUCK_RAMP_IN,
                        ramp_out: EAT_DUCK_RAMP_OUT)
-        @duck_amount <= 0.001 ? :done : :releasing
+        @duck.amount <= 0.001 ? :done : :releasing
       end
     end
 
@@ -226,16 +216,6 @@ module Audio
       args.audio
         .select { |k, v| k.to_s.start_with?("sfx_") && v[:stop_at] && args.tick_count >= v[:stop_at] }
         .each_key { |k| args.audio.delete(k) }
-    end
-
-    def advance_duck_amount
-      if @duck_active
-        step = 1.0 / @duck_ramp_in_ticks
-        @duck_amount = [@duck_amount + step, 1.0].min
-      else
-        step = 1.0 / @duck_ramp_out_ticks
-        @duck_amount = [@duck_amount - step, 0.0].max
-      end
     end
 
     def flush_rhythmic_sfx(args)
