@@ -1,3 +1,8 @@
+# Bugs & Tweaks
+
+- sometimes frightened ghosts don't move after hitting a wall needs to be investigated and fixed
+- during powerpellet mode, ghosts shouldn't come out of the ghost house after being eaten until the mode ends
+
 # First vertical slice MVP
 
 ## Visuals
@@ -32,7 +37,9 @@
 - ghost state change visual feedback (color change, animation, etc)
 - proper dot sprites in place of simple squares (musical theme related, still 4 colors)
 - Palette (look in lospec.com) for a low color count palette (4 colors + black and white) with neon tones
-
+- shaders
+- particles
+- 
 ## Audio
 - longer music tracks, still loop based but more variation
 - better waka waka sound effect which should probably like a 5th stem
@@ -52,8 +59,5 @@
 
 ## Visuals
 
-- different skins
-- screen shake
-- enemy flash
-- shaders
-- particles
+- real toroid rendering instead of player teleporting from one side to the other
+- different skins/palettes
