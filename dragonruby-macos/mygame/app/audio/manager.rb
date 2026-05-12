@@ -2,6 +2,7 @@ require 'app/audio/native_bridge.rb'
 require 'app/audio/beat_clock.rb'
 require 'app/audio/duck_controller.rb'
 require 'app/audio/track_progression.rb'
+require 'app/audio/rhythmic_sfx_queue.rb'
 
 module Audio
   class Manager
@@ -31,11 +32,8 @@ module Audio
       )
 
       @duck            = DuckController.new
+      @rhythmic_sfx    = RhythmicSFXQueue.new
       @backend_mode    = NativeBridge.backend_mode
-      @rhythm_bpm      = BeatClock::DEFAULT_BPM
-      @rhythm_sfx_bpm  = @rhythm_bpm / 2.0
-      @pending_dot_tick = false
-      @pending_power_pellet = false
       @eat_freeze_hold_remaining = 0
       @eat_freeze_releasing = false
 
@@ -50,12 +48,11 @@ module Audio
       prune_sfx(args)
       @duck.tick
       sync_gains(args)
-      flush_rhythmic_sfx(args)
+      @rhythmic_sfx.tick(args)
     end
 
     def set_rhythm_bpm(bpm)
-      @rhythm_bpm = bpm.to_f
-      @rhythm_sfx_bpm = @rhythm_bpm / 2.0
+      @rhythmic_sfx.set_music_bpm(bpm)
     end
 
     def set_duck(_args, **kwargs)
@@ -75,11 +72,11 @@ module Audio
       return unless track
 
       @progression.record_dot(track)
-      @pending_dot_tick = true
+      @rhythmic_sfx.queue_dot_tick
     end
 
     def on_power_pellet(args)
-      @pending_power_pellet = true
+      @rhythmic_sfx.queue_power_pellet
     end
 
     def on_enemy_eaten(args, sequence: 1)
@@ -176,19 +173,6 @@ module Audio
       args.audio
         .select { |k, v| k.to_s.start_with?("sfx_") && v[:stop_at] && args.tick_count >= v[:stop_at] }
         .each_key { |k| args.audio.delete(k) }
-    end
-
-    def flush_rhythmic_sfx(args)
-      return unless BeatClock.step_changed?(args.tick_count, bpm: @rhythm_sfx_bpm)
-
-      if @pending_power_pellet
-        SFXPlayer.play(args, :power_pellet)
-        @pending_power_pellet = false
-        @pending_dot_tick = false
-      elsif @pending_dot_tick
-        SFXPlayer.play(args, :dot_tick)
-        @pending_dot_tick = false
-      end
     end
   end
 end
