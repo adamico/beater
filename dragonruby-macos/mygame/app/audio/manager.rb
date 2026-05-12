@@ -1,21 +1,22 @@
 require 'app/audio/native_bridge.rb'
 require 'app/audio/beat_clock.rb'
 require 'app/audio/duck_controller.rb'
+require 'app/audio/track_progression.rb'
 
 module Audio
   class Manager
     TRACKS     = [:drums, :bass, :lead, :chords].freeze
     DOT_COLORS = { red: :drums, green: :bass, blue: :lead, yellow: :chords }.freeze
-    MIN_CUTOFF_HZ = 20.0
-    MAX_CUTOFF_HZ = 20_000.0
 
     EAT_DUCK_GAIN_SCALE  = 0.4
     EAT_DUCK_RAMP_IN     = 1
     EAT_DUCK_RAMP_OUT    = 2
     EAT_FREEZE_HOLD_TICKS = 45 # 0.75 * 60-tick freeze
 
-    attr_reader :completion, :backend_mode
+    attr_reader :backend_mode
 
+    def completion = @progression.completion
+    def overall_completion = @progression.overall_completion
     def duck_active = @duck.active?
     def duck_amount = @duck.amount
     def duck_gain_scale = @duck.gain_scale
@@ -24,11 +25,10 @@ module Audio
     def initialize(args)
       @definitions  = TrackLibrary.build_all
       @players      = {}
-      @dot_totals   = { drums: 20, bass: 20, lead: 20, chords: 20 }
-      @dot_counts   = { drums: 0,  bass: 0,  lead: 0,  chords: 0  }
-      @completion   = { drums: 0.0, bass: 0.0, lead: 0.0, chords: 0.0 }
-
-      @configs = TRACK_CONFIGS.transform_values(&:dup)
+      @progression  = TrackProgression.new(
+        tracks:  TRACKS,
+        configs: TRACK_CONFIGS.transform_values(&:dup)
+      )
 
       @duck            = DuckController.new
       @backend_mode    = NativeBridge.backend_mode
@@ -67,17 +67,14 @@ module Audio
     end
 
     def set_dot_totals(totals)
-      @dot_totals.merge!(totals)
+      @progression.set_totals(totals)
     end
 
     def on_dot_collected(args, color_or_track)
       track = resolve_track(color_or_track)
       return unless track
 
-      @dot_counts[track] += 1
-      ratio              = (@dot_counts[track].to_f / @dot_totals[track]).clamp(0.0, 1.0)
-      @completion[track] = ratio
-      @players[track].update_completion(ratio)
+      @progression.record_dot(track)
       @pending_dot_tick = true
     end
 
@@ -137,10 +134,7 @@ module Audio
     end
 
     def on_level_complete(args)
-      TRACKS.each do |n|
-        @completion[n] = 1.0
-        @players[n].unlock_fully
-      end
+      @progression.unlock_all
       sync_gains(args)
     end
 
@@ -153,19 +147,10 @@ module Audio
 
     def set_track_config(track, **overrides)
       raise ArgumentError, "Unknown track '#{track}'" unless TRACKS.include?(track)
-
-      cfg = @configs[track]
-      overrides.each do |key, value|
-        raise ArgumentError, "Unknown TrackConfig field '#{key}'" unless cfg.respond_to?(:"#{key}=")
-        cfg.send(:"#{key}=", value)
-      end
+      @progression.set_config(track, **overrides)
     end
 
     def filter_type(track) = @players[track]&.filter_type
-
-    def overall_completion
-      @completion.values.sum / TRACKS.length.to_f
-    end
 
     private
 
@@ -173,19 +158,9 @@ module Audio
       TRACKS.include?(color_or_track) ? color_or_track : DOT_COLORS[color_or_track]
     end
 
-    def interpolated_params(track, t)
-      cfg = @configs[track]
-      t   = t.clamp(0.0, 1.0)
-
-      cutoff_hz = interpolated_cutoff_hz(cfg, t)
-      gain = cfg.start_gain + t * (cfg.end_gain - cfg.start_gain)
-
-      [cutoff_hz, gain]
-    end
-
     def sync_gains(args)
       TRACKS.each do |n|
-        cutoff_hz, gain = interpolated_params(n, @completion[n])
+        cutoff_hz, gain = @progression.params(n)
         @players[n].apply_mix_settings(
           args,
           gain: gain,
@@ -195,21 +170,6 @@ module Audio
           bypass_mix: 1.0
         )
       end
-    end
-
-    def interpolated_cutoff_hz(cfg, t)
-      return nil unless cfg.start_cutoff.is_a?(Numeric)
-
-      end_cutoff = cfg.end_cutoff == :bypass ? cfg.start_cutoff : cfg.end_cutoff
-      return nil unless end_cutoff.is_a?(Numeric)
-
-      start_hz = cfg.start_cutoff.to_f.clamp(MIN_CUTOFF_HZ, MAX_CUTOFF_HZ)
-      end_hz = end_cutoff.to_f.clamp(MIN_CUTOFF_HZ, MAX_CUTOFF_HZ)
-      return start_hz if start_hz == end_hz
-
-      start_ln = Math.log(start_hz)
-      end_ln = Math.log(end_hz)
-      Math.exp(start_ln + t * (end_ln - start_ln))
     end
 
     def prune_sfx(args)

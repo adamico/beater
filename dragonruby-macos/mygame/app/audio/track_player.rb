@@ -1,13 +1,12 @@
 module Audio
   class TrackPlayer
-    attr_reader :track_key, :completion, :filter_type, :backend
+    attr_reader :track_key, :filter_type, :backend
     DEFAULT_STREAM_SAMPLE_RATE = MusicTheory::SAMPLE_RATE
 
     def initialize(track_name, definition, args, backend: :legacy)
       @track_name  = track_name
       @track_key   = :"track_#{track_name}"
       @definition  = definition
-      @completion  = 0.0
       @filter_type = :none
       @backend     = backend
       @stream_sample_rate = self.class.detect_wav_sample_rate(@definition.input_path) || DEFAULT_STREAM_SAMPLE_RATE
@@ -15,18 +14,6 @@ module Audio
       @last_output_gain = nil
 
       register_audio(args)
-    end
-
-    def update_completion(ratio)
-      @completion = ratio.clamp(0.0, 1.0)
-    end
-
-    def queue_dot_sfx
-      nil
-    end
-
-    def unlock_fully
-      update_completion(1.0)
     end
 
     def swap_filter(type, **opts)
