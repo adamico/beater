@@ -23,7 +23,7 @@ def test_ghost_multiple_ticks_with_turns args, assert
     old_x, old_y = ghost.x, ghost.y
     
     # Replicate tick_ghosts step-by-step
-    game.handle_ghost_state_transitions(ghost)
+    game.instance_variable_get(:@ghost_fsm).tick_transitions(ghost)
     return unless ghost.controller
     
     # Pre-turn state

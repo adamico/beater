@@ -8,6 +8,11 @@ module Audio
     MIN_CUTOFF_HZ = 20.0
     MAX_CUTOFF_HZ = 20_000.0
 
+    EAT_DUCK_GAIN_SCALE  = 0.4
+    EAT_DUCK_RAMP_IN     = 1
+    EAT_DUCK_RAMP_OUT    = 2
+    EAT_FREEZE_HOLD_TICKS = 45 # 0.75 * 60-tick freeze
+
     attr_reader :completion, :duck_active, :duck_amount, :duck_gain_scale, :backend_mode
 
     def initialize(args)
@@ -29,6 +34,8 @@ module Audio
       @rhythm_sfx_bpm  = @rhythm_bpm / 2.0
       @pending_dot_tick = false
       @pending_power_pellet = false
+      @eat_freeze_hold_remaining = 0
+      @eat_freeze_releasing = false
 
       NativeBridge.load_stems(@definitions) if @backend_mode == :native
 
@@ -95,6 +102,48 @@ module Audio
     def on_game_over(args)
       TRACKS.each { |n| args.audio[@players[n].track_key]&.tap { |a| a.paused = true } }
       SFXPlayer.play(args, :game_over)
+    end
+
+    def on_ghost_eat_imminent(args, imminent:)
+      set_duck(args, active: imminent,
+                     gain_scale: EAT_DUCK_GAIN_SCALE,
+                     ramp_in: EAT_DUCK_RAMP_IN,
+                     ramp_out: EAT_DUCK_RAMP_OUT)
+    end
+
+    def on_ghost_eat_freeze_begin(args)
+      set_duck(args, active: true,
+                     gain_scale: EAT_DUCK_GAIN_SCALE,
+                     ramp_in: EAT_DUCK_RAMP_IN,
+                     ramp_out: EAT_DUCK_RAMP_OUT,
+                     immediate: true)
+      @eat_freeze_hold_remaining = EAT_FREEZE_HOLD_TICKS
+      @eat_freeze_releasing = false
+    end
+
+    def on_ghost_eat_freeze_tick(args)
+      if !@eat_freeze_releasing
+        set_duck(args, active: true,
+                       gain_scale: EAT_DUCK_GAIN_SCALE,
+                       ramp_in: EAT_DUCK_RAMP_IN,
+                       ramp_out: EAT_DUCK_RAMP_OUT)
+        @eat_freeze_hold_remaining -= 1
+        @eat_freeze_releasing = true if @eat_freeze_hold_remaining <= 0
+        :holding
+      else
+        set_duck(args, active: false,
+                       gain_scale: EAT_DUCK_GAIN_SCALE,
+                       ramp_in: EAT_DUCK_RAMP_IN,
+                       ramp_out: EAT_DUCK_RAMP_OUT)
+        @duck_amount <= 0.001 ? :done : :releasing
+      end
+    end
+
+    def on_level_complete_duck_clear(args)
+      set_duck(args, active: false,
+                     gain_scale: EAT_DUCK_GAIN_SCALE,
+                     ramp_in: EAT_DUCK_RAMP_IN,
+                     ramp_out: EAT_DUCK_RAMP_OUT)
     end
 
     def on_level_complete(args)

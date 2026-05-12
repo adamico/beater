@@ -11,6 +11,11 @@ require 'app/ghost_controllers.rb'
 require 'app/world.rb'
 require 'app/renderer.rb'
 require 'app/audio/beat_clock.rb'
+require 'app/phase_scheduler.rb'
+require 'app/frightened_timer.rb'
+require 'app/release_schedule.rb'
+require 'app/ghost_state_machine.rb'
+require 'app/eat_sequencer.rb'
 require 'data/maps/pacman_layout.rb'
 
 class Game
@@ -31,35 +36,9 @@ class Game
 
   GHOST_SPEED            = PLAYER_SPEED * GHOST_SPEED_RATIO
   GHOST_FRIGHTENED_SPEED = PLAYER_SPEED * GHOST_FRIGHTENED_RATIO
-  FRIGHTENED_DURATION_TICKS = 600 # 10s @ 60fps
 
-  PHASE_TABLE = [
-    [:scatter,  7 * 60],
-    [:chase,   20 * 60],
-    [:scatter,  7 * 60],
-    [:chase,   20 * 60],
-    [:scatter,  5 * 60],
-    [:chase,   20 * 60],
-    [:scatter,  5 * 60],
-    [:chase,   nil]
-  ].freeze
-
-  RELEASE_DOT_THRESHOLD = {
-    blinky: 0,
-    pinky:  0,
-    inky:   30,
-    clyde:  60
-  }.freeze
-  RELEASE_STALL_TICKS = 4 * 60
-
-  EAT_POINTS = [200, 400, 800, 1600].freeze
-  EAT_PAUSE_TICKS = 60 # 1s arcade-style freeze on eat
-  EAT_DUCK_HOLD_RATIO = 0.75
   PRE_EAT_DUCK_LOOKAHEAD_CELLS = 1.5
   PRE_EAT_DUCK_LATERAL_TOL_CELLS = 0.8
-  DUCK_GAIN_SCALE = 0.4
-  DUCK_RAMP_IN_TICKS = 1
-  DUCK_RAMP_OUT_TICKS = 2
 
   STEP_INPUT_GRACE_TICKS = 3
 
@@ -81,17 +60,18 @@ class Game
     @spawn_cells = scan_spawn_cells
     @player_spawn = scan_player_spawn
     @above_door_cell = @spawn_cells[:blinky]
-    @dot_count = 0
-    @ticks_since_release = 0
-    @phase_index = 0
-    @phase_ticks = 0
-    @frightened_ticks = 0
-    @eat_chain = 0
+
+    @phase_scheduler = PhaseScheduler.new { |mode| apply_phase_to_ghosts(mode) }
+    @frightened_timer = FrightenedTimer.new { restore_ghosts_from_frightened }
+    @release_schedule = ReleaseSchedule.new
+    @ghost_fsm = GhostStateMachine.new(
+      projection: @projection,
+      above_door_cell: @above_door_cell,
+      current_mode_fn: -> { @phase_scheduler.current_mode }
+    )
+    @eat_sequencer = EatSequencer.new(state_machine: @ghost_fsm)
+
     @score = 0
-    @eat_pause_ticks = 0
-    @eat_duck_hold_ticks = 0
-    @eat_duck_releasing = false
-    @eat_popup = nil
     @level_complete = false
     @audio_state_for = nil
     initialize_player
@@ -122,8 +102,8 @@ class Game
   end
 
   # Each ghost identity has one or more spawn marker chars in the layout.
-  # Use the leftmost (smallest gx) for ghosts with multiple markers — that
-  # is the anchor of the 2-tile-wide sprite quad.
+  # Use the leftmost (smallest gx) for ghosts with multiple markers — anchor of
+  # the 2-tile-wide sprite quad.
   def scan_spawn_cells
     cells = {}
     @maze.each_cell do |gx, gy, ch|
@@ -163,10 +143,10 @@ class Game
   end
 
   def reset_ghost_states
-    @released = { blinky: true, pinky: false, inky: false, clyde: false }
+    @release_schedule.reset
     @ghosts.each do |g|
       if g.identity == :blinky
-        g.state = current_phase_mode
+        g.state = @phase_scheduler.current_mode
         g.role = Tiles::ROLE_DEFAULT
         g.controller = GhostControllers.for(g.identity)
       else
@@ -185,28 +165,20 @@ class Game
     toggle_audio_debug_watch
 
     if @level_complete
-      args.state.audio.set_duck(args, active: false,
-                                      gain_scale: DUCK_GAIN_SCALE,
-                                      ramp_in: DUCK_RAMP_IN_TICKS,
-                                      ramp_out: DUCK_RAMP_OUT_TICKS)
+      args.state.audio.on_level_complete_duck_clear(args)
       request_reset_if_any_key
-      @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, popup: @eat_popup, level_complete: true)
+      @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, popup: @eat_sequencer.popup, level_complete: true)
       draw_audio_debug_watch if args.state.debug_audio
       return
     end
 
-    if @eat_pause_ticks > 0
-      process_eat_freeze_duck
+    if @eat_sequencer.frozen?
+      @eat_sequencer.tick_freeze(args)
       visible_ghosts = @ghosts.reject { |g| g.state == :eaten }
-      @renderer.draw(outputs, @maze, @pellets, nil, visible_ghosts, popup: @eat_popup, level_complete: false)
+      @renderer.draw(outputs, @maze, @pellets, nil, visible_ghosts, popup: @eat_sequencer.popup, level_complete: false)
       draw_audio_debug_watch if args.state.debug_audio
       return
     end
-
-    args.state.audio.set_duck(args, active: false,
-                                    gain_scale: DUCK_GAIN_SCALE,
-                                    ramp_in: DUCK_RAMP_IN_TICKS,
-                                    ramp_out: DUCK_RAMP_OUT_TICKS)
 
     tick_phase
     tick_frightened
@@ -222,79 +194,42 @@ class Game
     )
 
     tick_player(world)
-    maybe_preduck_ghost_eat
+    args.state.audio.on_ghost_eat_imminent(args, imminent: ghost_eat_imminent?)
     if check_level_complete
-      @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, popup: @eat_popup, level_complete: true)
+      @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, popup: @eat_sequencer.popup, level_complete: true)
       draw_audio_debug_watch if args.state.debug_audio
       return
     end
     tick_ghosts(world)
     tick_collisions
-    @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, popup: @eat_popup, level_complete: false)
+    @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, popup: @eat_sequencer.popup, level_complete: false)
     draw_audio_debug_watch if args.state.debug_audio
   end
 
   def tick_phase
-    return if any_frightened?
-    _, dur = PHASE_TABLE[@phase_index]
-    return if dur.nil?
-    @phase_ticks += 1
-    return if @phase_ticks < dur
-    @phase_index += 1
-    @phase_ticks = 0
-    apply_phase_to_ghosts
+    @phase_scheduler.tick(paused: @frightened_timer.active?)
   end
 
-  def current_phase_mode
-    PHASE_TABLE[@phase_index][0]
-  end
-
-  def apply_phase_to_ghosts
-    mode = current_phase_mode
-    @ghosts.each do |g|
-      next unless g.state == :scatter || g.state == :chase
-      g.state = mode
-      g.face(g.direction.opposite) unless g.direction.none?
-    end
+  def apply_phase_to_ghosts(mode)
+    @ghosts.each { |g| @ghost_fsm.apply_phase(g, mode) }
   end
 
   def tick_frightened
-    return if @frightened_ticks <= 0
-    @frightened_ticks -= 1
-    @ghosts.each { |g| g.frightened_remaining_ticks = @frightened_ticks if g.state == :frightened }
-    return if @frightened_ticks > 0
-    mode = current_phase_mode
-    @ghosts.each do |g|
-      if g.state == :frightened
-        g.state = mode
-        g.controller = GhostControllers.for(g.identity)
-        g.speed = g.base_speed
-        snap_to_cell(g)
-      end
+    @frightened_timer.tick do |remaining|
+      @ghosts.each { |g| g.frightened_remaining_ticks = remaining if g.state == :frightened }
     end
-    @eat_chain = 0
+  end
+
+  def restore_ghosts_from_frightened
+    @ghosts.each { |g| @ghost_fsm.restore_from_frightened(g) }
+    @eat_sequencer.reset_chain
   end
 
   def tick_releases
-    @ticks_since_release += 1
-    Ghost::IDENTITIES.each do |id|
-      next if @released[id]
-      threshold = RELEASE_DOT_THRESHOLD[id]
-      if @dot_count >= threshold || @ticks_since_release >= RELEASE_STALL_TICKS
-        @released[id] = true
-        @ticks_since_release = 0
-        ghost = @ghosts.find { |g| g.identity == id }
-        start_leaving_house(ghost) if ghost && ghost.state == :in_house
-        break
-      end
+    @release_schedule.tick do |id|
+      ghost = @ghosts.find { |g| g.identity == id }
+      @ghost_fsm.start_leaving(ghost) if ghost && ghost.state == :in_house
     end
-  end
-
-  def start_leaving_house(ghost)
-    ghost.state = :leaving_house
-    ghost.role = Tiles::ROLE_GHOST_LEAVING
-    ghost.controller = GhostControllers::LeavingHouse.new(@above_door_cell)
-    ghost.face(Direction::UP)
   end
 
   def tick_player(world)
@@ -314,8 +249,7 @@ class Game
       next unless entry
 
       kind = entry[:kind]
-      @dot_count += 1
-      @ticks_since_release = 0
+      @release_schedule.on_dot_eaten
       @score += (kind == :power ? 50 : 10)
       if kind == :power
         args.state.audio.on_power_pellet(args)
@@ -327,80 +261,24 @@ class Game
   end
 
   def trigger_frightened
-    @frightened_ticks = FRIGHTENED_DURATION_TICKS
-    @eat_chain = 0
+    @frightened_timer.trigger
+    @eat_sequencer.reset_chain
     @ghosts.each do |g|
-      next unless g.state == :scatter || g.state == :chase
-      g.state = :frightened
-      g.controller = GhostControllers::Frightened.new
-      g.speed = GHOST_FRIGHTENED_SPEED
-      g.frightened_remaining_ticks = FRIGHTENED_DURATION_TICKS
-      g.face(g.direction.opposite) unless g.direction.none?
+      @ghost_fsm.enter_frightened(g, GHOST_FRIGHTENED_SPEED, @frightened_timer.remaining)
     end
   end
 
   def tick_ghosts(world)
+    debug = args&.state&.debug_ghost
     @ghosts.each do |g|
       next if g.state == :in_house
 
-      handle_ghost_state_transitions(g)
+      @ghost_fsm.tick_transitions(g, debug: debug)
       next unless g.controller
 
       intent = g.controller.next_direction(world, g)
       g.update(intent: intent, maze: @maze, projection: @projection)
     end
-  end
-
-  def handle_ghost_state_transitions(ghost)
-    case ghost.state
-    when :eaten
-      log_transition_attempt(ghost, ghost.spawn_cell, :eaten_to_leaving)
-      transition_at_cell_center(ghost, ghost.spawn_cell) { start_leaving_house(ghost) }
-    when :leaving_house
-      log_transition_attempt(ghost, @above_door_cell, :leaving_to_chase)
-      transition_at_cell_center(ghost, @above_door_cell) do
-        ghost.state = current_phase_mode
-        ghost.role = Tiles::ROLE_DEFAULT
-        ghost.controller = GhostControllers.for(ghost.identity)
-        ghost.speed = ghost.base_speed
-      end
-    end
-  end
-
-  def log_transition_attempt(ghost, target_cell, label)
-    @transition_log_last ||= {}
-    key = [ghost.identity, label]
-    tick = Kernel.tick_count
-    last = @transition_log_last[key] || -1000
-    return if tick - last < 60
-
-    cur = ghost.grid_cell(@projection)
-    tol = ghost.speed.to_f + GhostControllers::DECISION_EPSILON
-    centered = ghost.at_cell_center?(@projection, tolerance: tol)
-    cs = @projection.cell_size.to_f
-    x_cells = (ghost.x - @projection.offset_x).to_f / cs
-    y_cells = (ghost.y - @projection.offset_y).to_f / cs
-    round_cell = [x_cells.round, y_cells.round]
-    err = [(x_cells - x_cells.round).abs * cs, (y_cells - y_cells.round).abs * cs]
-
-    return if cur == target_cell && centered
-
-    @transition_log_last[key] = tick
-    puts "[GHOST TRANSIT] tick=#{tick} id=#{ghost.identity} #{label} " \
-         "pos=(#{ghost.x.round(2)},#{ghost.y.round(2)}) " \
-         "cell_floor=#{cur.inspect} cell_round=#{round_cell.inspect} target=#{target_cell.inspect} " \
-         "centered=#{centered} err=(#{err[0].round(2)},#{err[1].round(2)}) tol=#{tol.round(2)} " \
-         "dir=#{ghost.direction.name} role=#{ghost.role.inspect}"
-  end
-
-  def transition_at_cell_center(ghost, target_cell)
-    return unless ghost.grid_cell(@projection) == target_cell
-
-    tol = ghost.speed.to_f + GhostControllers::DECISION_EPSILON
-    return unless ghost.at_cell_center?(@projection, tolerance: tol)
-
-    ghost.snap_to_cell_center!(@projection)
-    yield
   end
 
   def tick_collisions
@@ -417,59 +295,7 @@ class Game
   end
 
   def eat_ghost(ghost)
-    points = EAT_POINTS[[@eat_chain, EAT_POINTS.size - 1].min]
-    @score += points
-    args.state.audio.set_duck(args, active: true,
-                                    gain_scale: DUCK_GAIN_SCALE,
-                                    ramp_in: DUCK_RAMP_IN_TICKS,
-                                    ramp_out: DUCK_RAMP_OUT_TICKS,
-                                    immediate: true)
-    # Audio tick normally runs at frame start; push updated duck now so hit is immediate.
-    args.state.audio.tick(args)
-    args.state.audio.on_enemy_eaten(args, sequence: @eat_chain + 1)
-    @eat_chain += 1
-    ghost.state = :eaten
-    ghost.role = Tiles::ROLE_GHOST_EATEN
-    ghost.controller = GhostControllers::Eaten.new
-    ghost.speed = ghost.base_speed
-    snap_to_cell(ghost)
-    @eat_pause_ticks = EAT_PAUSE_TICKS
-    @eat_duck_hold_ticks = (EAT_PAUSE_TICKS * EAT_DUCK_HOLD_RATIO).to_i
-    @eat_duck_releasing = false
-    @eat_popup = { x: ghost.x + ghost.w / 2, y: ghost.y + ghost.h / 2, text: points.to_s }
-  end
-
-  def process_eat_freeze_duck
-    if !@eat_duck_releasing
-      args.state.audio.set_duck(args, active: true,
-                                      gain_scale: DUCK_GAIN_SCALE,
-                                      ramp_in: DUCK_RAMP_IN_TICKS,
-                                      ramp_out: DUCK_RAMP_OUT_TICKS)
-      @eat_duck_hold_ticks -= 1
-      @eat_duck_releasing = true if @eat_duck_hold_ticks <= 0
-    else
-      args.state.audio.set_duck(args, active: false,
-                                      gain_scale: DUCK_GAIN_SCALE,
-                                      ramp_in: DUCK_RAMP_IN_TICKS,
-                                      ramp_out: DUCK_RAMP_OUT_TICKS)
-    end
-
-    @eat_pause_ticks -= 1 if @eat_pause_ticks > 0
-
-    # Freeze ends only after both base freeze budget and duck release complete.
-    if @eat_pause_ticks <= 0 && args.state.audio.duck_amount <= 0.001
-      @eat_pause_ticks = 0
-      @eat_duck_releasing = false
-      @eat_popup = nil
-    end
-  end
-
-  def maybe_preduck_ghost_eat
-    imminent = ghost_eat_imminent?
-    args.state.audio.set_duck(args, active: imminent,
-                                    gain_scale: DUCK_GAIN_SCALE,
-                                    ramp_in: DUCK_RAMP_IN_TICKS,
-                                    ramp_out: DUCK_RAMP_OUT_TICKS)
+    @score += @eat_sequencer.on_ghost_eaten(args, ghost)
   end
 
   def ghost_eat_imminent?
@@ -511,26 +337,10 @@ class Game
       g.x = rect[:x]
       g.y = rect[:y]
     end
+    @phase_scheduler.reset
+    @frightened_timer.reset
+    @eat_sequencer.reset
     reset_ghost_states
-    @phase_index = 0
-    @phase_ticks = 0
-    @frightened_ticks = 0
-    @eat_chain = 0
-    @ticks_since_release = 0
-  end
-
-  # Frightened ghosts run at odd speed (1) so their pixel position can fall
-  # off the integer-cell-aligned grid. When transitioning to a state whose
-  # speed is even, that drift would prevent at_cell_center? from ever firing
-  # again, freezing all turning decisions. Snap on entry to fix.
-  def snap_to_cell(ghost)
-    cs = @projection.cell_size
-    ghost.x = ((ghost.x - @projection.offset_x) / cs).round * cs + @projection.offset_x
-    ghost.y = ((ghost.y - @projection.offset_y) / cs).round * cs + @projection.offset_y
-  end
-
-  def any_frightened?
-    @frightened_ticks > 0
   end
 
   def ensure_audio_state
@@ -559,10 +369,7 @@ class Game
     return false if @level_complete || @pellets.remaining != 0
 
     @level_complete = true
-    args.state.audio.set_duck(args, active: false,
-                                    gain_scale: DUCK_GAIN_SCALE,
-                                    ramp_in: DUCK_RAMP_IN_TICKS,
-                                    ramp_out: DUCK_RAMP_OUT_TICKS)
+    args.state.audio.on_level_complete_duck_clear(args)
     args.state.audio.on_level_complete(args)
     true
   end
