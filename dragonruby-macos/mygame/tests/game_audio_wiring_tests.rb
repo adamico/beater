@@ -109,12 +109,13 @@ class AudioSpy
     @level_complete_calls += 1
   end
 
-  def set_duck(_args, active:, gain_scale:, ramp_in:, ramp_out:)
+  def set_duck(_args, active:, gain_scale:, ramp_in:, ramp_out:, immediate: false)
     @duck_calls << {
       active: active,
       gain_scale: gain_scale,
       ramp_in: ramp_in,
-      ramp_out: ramp_out
+      ramp_out: ramp_out,
+      immediate: immediate
     }
     @duck_active = active
   end
@@ -239,7 +240,14 @@ def test_tick_duck_inactive_during_normal_play args, assert
   assert.true! audio.duck_calls.any? { |call| !call[:active] }
 end
 
+def force_legacy_audio_backend!
+  Audio::NativeBridge.define_singleton_method(:backend_mode) { :legacy }
+  Audio::NativeBridge.define_singleton_method(:ready_for_streaming?) { false }
+  Audio::NativeBridge.define_singleton_method(:load_stems) { |_| true }
+end
+
 def test_audio_manager_registers_looping_music_stems args, assert
+  force_legacy_audio_backend!
   audio_args = make_args_with_audio_spy
   manager = Audio::Manager.new(audio_args)
 
@@ -253,6 +261,7 @@ def test_audio_manager_registers_looping_music_stems args, assert
 end
 
 def test_audio_manager_linearly_updates_track_gain_from_completion args, assert
+  force_legacy_audio_backend!
   audio_args = make_args_with_audio_spy
   manager = Audio::Manager.new(audio_args)
 
