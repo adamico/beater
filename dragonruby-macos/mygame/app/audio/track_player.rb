@@ -1,3 +1,5 @@
+require 'app/audio/wav_inspector.rb'
+
 module Audio
   class TrackPlayer
     attr_reader :track_key, :backend
@@ -8,7 +10,7 @@ module Audio
       @track_key   = :"track_#{track_name}"
       @definition  = definition
       @backend     = backend
-      @stream_sample_rate = self.class.detect_wav_sample_rate(@definition.input_path) || DEFAULT_STREAM_SAMPLE_RATE
+      @stream_sample_rate = WavInspector.sample_rate(@definition.input_path) || DEFAULT_STREAM_SAMPLE_RATE
       @last_native_params = nil
       @last_output_gain = nil
 
@@ -18,15 +20,25 @@ module Audio
     def apply_mix_settings(args, gain:, cutoff_hz:, resonance:, duck_multiplier:, bypass_mix:)
       final_gain = (gain.to_f * duck_multiplier.to_f).clamp(0.0, 1.2)
 
-      # For procedural streams, changing gain while playing can cause clicks.
-      # Keep native stream gain stable; only legacy/file playback uses this path.
-      if @backend != :native && (!@last_output_gain || (@last_output_gain - final_gain).abs > 0.001)
-        args.audio[@track_key]&.tap { |a| a.gain = final_gain }
-        @last_output_gain = final_gain
+      if @backend == :native
+        apply_native_mix(final_gain, cutoff_hz, resonance)
+      else
+        apply_legacy_mix(args, final_gain)
       end
+    end
 
-      return unless @backend == :native
+    private
 
+    # Native streams render gain inside the C DSP; we only push when params
+    # actually change. Changing legacy stream gain mid-playback can click,
+    # so legacy gates on a small delta.
+    def apply_legacy_mix(args, final_gain)
+      return if @last_output_gain && (@last_output_gain - final_gain).abs <= 0.001
+      args.audio[@track_key]&.tap { |a| a.gain = final_gain }
+      @last_output_gain = final_gain
+    end
+
+    def apply_native_mix(final_gain, cutoff_hz, resonance)
       current_params = {
         cutoff_hz: cutoff_hz ? cutoff_hz.to_f : nil,
         resonance: resonance ? resonance.to_f : nil,
@@ -45,38 +57,6 @@ module Audio
         gain: current_params[:gain],
         bypass_mix: current_params[:bypass_mix]
       )
-    end
-
-    private
-
-    def self.detect_wav_sample_rate(path)
-      return nil unless path
-      candidates = [
-        path,
-        File.join("mygame", path)
-      ]
-
-      candidates.each do |candidate|
-        begin
-          bytes = if File.respond_to?(:binread)
-                    File.binread(candidate)
-                  else
-                    File.read(candidate)
-                  end
-          next unless bytes
-
-          header = bytes[0, 44]
-          next unless header && header.bytesize >= 28
-          next unless header[0, 4] == "RIFF" && header[8, 4] == "WAVE"
-
-          sample_rate = header[24, 4].unpack("V")[0]
-          return sample_rate if sample_rate && sample_rate > 0
-        rescue StandardError
-          next
-        end
-      end
-
-      nil
     end
 
     def same_native_params?(a, b)
@@ -123,7 +103,6 @@ module Audio
             offset_frames: offset_frames,
             frame_count: frame_count
           )
-          # Native chunk is interleaved stereo, so advance by frame count.
           offset_frames += (chunk.length / 2)
           chunk
         }],
