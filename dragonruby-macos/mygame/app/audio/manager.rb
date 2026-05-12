@@ -135,19 +135,10 @@ module Audio
       sync_gains(args)
     end
 
-    def set_filter(track, type, **opts)
-      raise ArgumentError, "Unknown track '#{track}'. Valid: #{TRACKS.join(', ')}" unless TRACKS.include?(track)
-      raise ArgumentError, "Unknown filter '#{type}'."                              unless FilterFactory.valid?(type)
-
-      @players[track].swap_filter(type, **opts)
-    end
-
     def set_track_config(track, **overrides)
       raise ArgumentError, "Unknown track '#{track}'" unless TRACKS.include?(track)
       @progression.set_config(track, **overrides)
     end
-
-    def filter_type(track) = @players[track]&.filter_type
 
     private
 

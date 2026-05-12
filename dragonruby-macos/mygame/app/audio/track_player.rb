@@ -1,23 +1,18 @@
 module Audio
   class TrackPlayer
-    attr_reader :track_key, :filter_type, :backend
+    attr_reader :track_key, :backend
     DEFAULT_STREAM_SAMPLE_RATE = MusicTheory::SAMPLE_RATE
 
     def initialize(track_name, definition, args, backend: :legacy)
       @track_name  = track_name
       @track_key   = :"track_#{track_name}"
       @definition  = definition
-      @filter_type = :none
       @backend     = backend
       @stream_sample_rate = self.class.detect_wav_sample_rate(@definition.input_path) || DEFAULT_STREAM_SAMPLE_RATE
       @last_native_params = nil
       @last_output_gain = nil
 
       register_audio(args)
-    end
-
-    def swap_filter(type, **opts)
-      @filter_type = type
     end
 
     def apply_mix_settings(args, gain:, cutoff_hz:, resonance:, duck_multiplier:, bypass_mix:)

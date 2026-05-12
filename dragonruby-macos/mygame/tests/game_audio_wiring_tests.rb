@@ -268,7 +268,6 @@ def test_audio_manager_registers_looping_music_stems args, assert
   audio_args = make_args_with_audio_spy
   manager = Audio::Manager.new(audio_args)
 
-  assert.equal! manager.filter_type(:drums), :none
   assert.equal! audio_args.audio[:track_drums][:input], "sounds/music/drums.wav"
   assert.equal! audio_args.audio[:track_bass][:input], "sounds/music/bass.wav"
   assert.equal! audio_args.audio[:track_lead][:input], "sounds/music/lead.wav"
