@@ -15,6 +15,8 @@ module GhostControllers
   end
 
   module Targeting
+    @last_log_tick = {}
+
     def self.next_direction(ghost, world, target_tile)
       return Direction::NONE unless GhostControllers.at_decision_point?(ghost, world.projection)
 
@@ -23,9 +25,12 @@ module GhostControllers
 
       best = nil
       best_dist = nil
+      walk_map = {}
       candidates.each do |d|
         nx, ny = gx + d.dx, gy + d.dy
-        next unless world.maze.walkable?(nx, ny, role: ghost.role)
+        walkable = world.maze.walkable?(nx, ny, role: ghost.role)
+        walk_map[d.name] = walkable
+        next unless walkable
         dist = (nx - target_tile[0])**2 + (ny - target_tile[1])**2
         if best_dist.nil? || dist < best_dist
           best = d
@@ -33,7 +38,37 @@ module GhostControllers
         end
       end
 
-      best || ghost.direction.opposite
+      if best.nil?
+        log_phantom_reverse(ghost, world, gx, gy, walk_map)
+        return ghost.direction.opposite
+      end
+
+      best
+    end
+
+    def self.log_phantom_reverse(ghost, world, gx, gy, walk_map)
+      tick = Kernel.tick_count
+      key = ghost.identity
+      last = @last_log_tick[key] || -1000
+      return if tick - last < 30
+
+      @last_log_tick[key] = tick
+
+      cs = world.projection.cell_size.to_f
+      ox = world.projection.offset_x
+      oy = world.projection.offset_y
+      x_cells = (ghost.x - ox).to_f / cs
+      y_cells = (ghost.y - oy).to_f / cs
+      cell_floor = [(x_cells).floor, (y_cells).floor]
+      cell_round = [(x_cells).round, (y_cells).round]
+      err = [(x_cells - x_cells.round).abs * cs, (y_cells - y_cells.round).abs * cs]
+      tol = ghost.speed.to_f + DECISION_EPSILON
+
+      puts "[GHOST 180°] tick=#{tick} id=#{key} state=#{ghost.state} role=#{ghost.role.inspect} " \
+           "pos=(#{ghost.x.round(2)}, #{ghost.y.round(2)}) " \
+           "cell_floor=#{cell_floor.inspect} cell_round=#{cell_round.inspect} " \
+           "decision_cell=(#{gx},#{gy}) center_err=(#{err[0].round(3)},#{err[1].round(3)}) tol=#{tol.round(3)} " \
+           "dir=#{ghost.direction.name} walkable=#{walk_map.inspect} -> reversed to #{ghost.direction.opposite.name}"
     end
   end
 

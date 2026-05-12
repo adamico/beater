@@ -22,8 +22,17 @@ class Ghost
   FRIGHTENED_FLASH_WINDOW = 120 # last 2s @ 60fps
   FRIGHTENED_FLASH_PERIOD = 15  # alternate every 0.25s (4 on-flashes in 2s)
 
-  attr_accessor :state, :controller, :frightened_remaining_ticks
-  attr_reader :identity, :scatter_target, :spawn_cell
+  attr_accessor :controller, :frightened_remaining_ticks
+  attr_reader :state, :identity, :scatter_target, :spawn_cell
+
+  def state=(new_state)
+    if @state != new_state
+      caller_line = caller(1, 1).first.to_s.split('/').last
+      puts "[GHOST STATE] tick=#{Kernel.tick_count} id=#{@identity} #{@state.inspect} -> #{new_state.inspect} " \
+           "dir=#{@direction&.name} role=#{@role.inspect} from=#{caller_line}"
+    end
+    @state = new_state
+  end
 
   def initialize(identity:, x:, y:, w:, h:, speed:, scatter_target:, spawn_cell:, controller:, direction: Direction::LEFT, sprite_scale: 2.0, sprite_offset_x: nil, sprite_offset_y: nil)
     init_grid_mover(x: x, y: y, w: w, h: h, speed: speed, direction: direction)

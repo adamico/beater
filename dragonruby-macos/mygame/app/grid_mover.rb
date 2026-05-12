@@ -146,10 +146,12 @@ module GridMover
     @y = ((@y - projection.offset_y) / cs).round * cs + projection.offset_y
   end
 
-  # Grid coords of the cell the rect is anchored to.
+  # Grid coords of the cell the rect's anchor is closest to.
+  # Must match at_cell_center? (which uses .round) so decision-point logic and
+  # transition checks agree about which cell the actor is "on".
   def grid_cell(projection)
     cs = projection.cell_size
-    [((@x - projection.offset_x) / cs).floor, ((@y - projection.offset_y) / cs).floor]
+    [((@x - projection.offset_x) / cs).round, ((@y - projection.offset_y) / cs).round]
   end
 
   def cell_center_error(projection)

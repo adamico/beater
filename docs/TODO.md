@@ -8,12 +8,10 @@
 
 ## Audio
 
-- Use builtin audio manager (see tools/audio_manager.rb)
-
 ## Gameplay
 
 - tweak actors speed (frightened and eaten ghosts)
-- bonus score collectables (not vanilla pacman?)
+- bonus score collectables
   
 ## UI
 

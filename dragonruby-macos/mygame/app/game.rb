@@ -354,8 +354,10 @@ class Game
   def handle_ghost_state_transitions(ghost)
     case ghost.state
     when :eaten
+      log_transition_attempt(ghost, ghost.spawn_cell, :eaten_to_leaving)
       transition_at_cell_center(ghost, ghost.spawn_cell) { start_leaving_house(ghost) }
     when :leaving_house
+      log_transition_attempt(ghost, @above_door_cell, :leaving_to_chase)
       transition_at_cell_center(ghost, @above_door_cell) do
         ghost.state = current_phase_mode
         ghost.role = Tiles::ROLE_DEFAULT
@@ -363,6 +365,32 @@ class Game
         ghost.speed = ghost.base_speed
       end
     end
+  end
+
+  def log_transition_attempt(ghost, target_cell, label)
+    @transition_log_last ||= {}
+    key = [ghost.identity, label]
+    tick = Kernel.tick_count
+    last = @transition_log_last[key] || -1000
+    return if tick - last < 60
+
+    cur = ghost.grid_cell(@projection)
+    tol = ghost.speed.to_f + GhostControllers::DECISION_EPSILON
+    centered = ghost.at_cell_center?(@projection, tolerance: tol)
+    cs = @projection.cell_size.to_f
+    x_cells = (ghost.x - @projection.offset_x).to_f / cs
+    y_cells = (ghost.y - @projection.offset_y).to_f / cs
+    round_cell = [x_cells.round, y_cells.round]
+    err = [(x_cells - x_cells.round).abs * cs, (y_cells - y_cells.round).abs * cs]
+
+    return if cur == target_cell && centered
+
+    @transition_log_last[key] = tick
+    puts "[GHOST TRANSIT] tick=#{tick} id=#{ghost.identity} #{label} " \
+         "pos=(#{ghost.x.round(2)},#{ghost.y.round(2)}) " \
+         "cell_floor=#{cur.inspect} cell_round=#{round_cell.inspect} target=#{target_cell.inspect} " \
+         "centered=#{centered} err=(#{err[0].round(2)},#{err[1].round(2)}) tol=#{tol.round(2)} " \
+         "dir=#{ghost.direction.name} role=#{ghost.role.inspect}"
   end
 
   def transition_at_cell_center(ghost, target_cell)
