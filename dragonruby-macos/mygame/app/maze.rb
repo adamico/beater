@@ -24,6 +24,7 @@ class Maze
     @chars = chars
     @width = width
     @height = height
+    @tunnel_cells = compute_tunnel_cells
   end
 
   def walkable?(gx, gy, role: Tiles::ROLE_DEFAULT)
@@ -32,12 +33,30 @@ class Maze
     Tiles.passable_for?(@chars[gy][gx], role)
   end
 
-  # A tunnel cell sits on a row whose left and right edges both wrap to
-  # walkable space (i.e. the row participates in horizontal toroidal wrap).
+  # A tunnel cell is a walkable cell on a wrap-row that's reachable from
+  # the wrap edge via an unbroken walkable run along its row. The interior
+  # of the wrap-row (separated from the edges by walls) is NOT tunnel.
   # Ghosts slow down while their current cell is a tunnel cell.
   def tunnel?(gx, gy)
-    return false if gy < 0 || gy >= @height
-    Tiles.walkable?(@chars[gy][0]) && Tiles.walkable?(@chars[gy][@width - 1])
+    @tunnel_cells.include?([gx, gy])
+  end
+
+  def compute_tunnel_cells
+    cells = {}
+    @height.times do |gy|
+      next unless Tiles.walkable?(@chars[gy][0]) && Tiles.walkable?(@chars[gy][@width - 1])
+      gx = 0
+      while gx < @width && Tiles.walkable?(@chars[gy][gx])
+        cells[[gx, gy]] = true
+        gx += 1
+      end
+      gx = @width - 1
+      while gx >= 0 && Tiles.walkable?(@chars[gy][gx])
+        cells[[gx, gy]] = true
+        gx -= 1
+      end
+    end
+    cells
   end
 
   # Toroidal coord normalization on the X axis. Y is not wrapped: maps with

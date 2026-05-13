@@ -23,7 +23,7 @@ class Game
   attr_dr
 
   LEVEL_BPM = 128
-  CELLS_PER_BEAT = 2.0
+  CELLS_PER_BEAT = 4.0
 
   CELL_SIZE = 20
   OFFSET_X = CELL_SIZE * 16
