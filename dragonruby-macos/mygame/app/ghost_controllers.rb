@@ -15,13 +15,16 @@ module GhostControllers
   end
 
   module Targeting
+    # OG arcade tie-break preference: UP > LEFT > DOWN > RIGHT.
+    TIE_BREAK_ORDER = [Direction::UP, Direction::LEFT, Direction::DOWN, Direction::RIGHT].freeze
+
     @last_log_tick = {}
 
     def self.next_direction(ghost, world, target_tile)
       return Direction::NONE unless GhostControllers.at_decision_point?(ghost, world.projection)
 
       gx, gy = ghost.grid_cell(world.projection)
-      candidates = Direction::ALL_MOVING.reject { |d| d == ghost.direction.opposite }
+      candidates = TIE_BREAK_ORDER.reject { |d| d == ghost.direction.opposite }
 
       best = nil
       best_dist = nil
@@ -95,7 +98,10 @@ module GhostControllers
 
   def self.blinky
     BaseChase.new(
-      scatter_target_fn: ->(_w, ghost) { ghost.scatter_target },
+      scatter_target_fn: ->(world, ghost) {
+        # Cruise Elroy: when active, Blinky targets Pac during scatter too.
+        ghost.elroy_state != :off ? world.player.grid_cell(world.projection) : ghost.scatter_target
+      },
       chase_target_fn:   ->(world, _g) { world.player.grid_cell(world.projection) }
     )
   end

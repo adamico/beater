@@ -15,6 +15,7 @@ require 'app/phase_scheduler.rb'
 require 'app/frightened_timer.rb'
 require 'app/release_schedule.rb'
 require 'app/ghost_state_machine.rb'
+require 'app/cruise_elroy.rb'
 require 'app/eat_sequencer.rb'
 require 'data/maps/pacman_layout.rb'
 
@@ -31,11 +32,17 @@ class Game
   FRAMES_PER_CELL = FRAMES_PER_BEAT / CELLS_PER_BEAT
   PLAYER_SPEED = CELL_SIZE / FRAMES_PER_CELL
 
-  GHOST_SPEED_RATIO = 1.1
+  GHOST_SPEED_RATIO      = 0.75 # OG Lvl 1
   GHOST_FRIGHTENED_RATIO = 0.5
+  GHOST_TUNNEL_RATIO     = 0.4  # OG Lvl 1 (in tunnel row)
+  GHOST_ELROY1_RATIO     = 0.85
+  GHOST_ELROY2_RATIO     = 0.95
 
   GHOST_SPEED            = PLAYER_SPEED * GHOST_SPEED_RATIO
   GHOST_FRIGHTENED_SPEED = PLAYER_SPEED * GHOST_FRIGHTENED_RATIO
+  GHOST_TUNNEL_SPEED     = PLAYER_SPEED * GHOST_TUNNEL_RATIO
+  GHOST_ELROY1_SPEED     = PLAYER_SPEED * GHOST_ELROY1_RATIO
+  GHOST_ELROY2_SPEED     = PLAYER_SPEED * GHOST_ELROY2_RATIO
 
   PRE_EAT_DUCK_LOOKAHEAD_CELLS = 1.5
   PRE_EAT_DUCK_LATERAL_TOL_CELLS = 0.8
@@ -250,6 +257,7 @@ class Game
 
       kind = entry[:kind]
       @release_schedule.on_dot_eaten
+      @player.on_dot_eaten
       @score += (kind == :power ? 50 : 10)
       if kind == :power
         args.state.audio.on_power_pellet(args)
@@ -270,6 +278,7 @@ class Game
 
   def tick_ghosts(world)
     debug = args&.state&.debug_ghost
+    apply_dynamic_speeds
     @ghosts.each do |g|
       next if g.state == :in_house
 
@@ -279,6 +288,33 @@ class Game
       intent = g.controller.next_direction(world, g)
       g.update(intent: intent, maze: @maze, projection: @projection)
     end
+  end
+
+  def apply_dynamic_speeds
+    clyde = @ghosts.find { |g| g.identity == :clyde }
+    clyde_in_house = clyde && clyde.state == :in_house
+    elroy = CruiseElroy.state(@pellets.remaining, clyde_in_house: clyde_in_house)
+    @ghosts.each do |g|
+      next if g.state == :in_house || g.state == :leaving_house
+
+      g.elroy_state = (g.identity == :blinky ? elroy : :off)
+
+      next if g.state == :eaten # eaten ghosts ignore tunnel slowdown
+      g.speed = effective_ghost_speed(g)
+    end
+  end
+
+  def effective_ghost_speed(g)
+    gx, gy = g.grid_cell(@projection)
+    return GHOST_TUNNEL_SPEED if @maze.tunnel?(gx, gy)
+    return GHOST_FRIGHTENED_SPEED if g.state == :frightened
+    if g.identity == :blinky
+      case g.elroy_state
+      when :elroy2 then return GHOST_ELROY2_SPEED
+      when :elroy1 then return GHOST_ELROY1_SPEED
+      end
+    end
+    g.base_speed
   end
 
   def tick_collisions

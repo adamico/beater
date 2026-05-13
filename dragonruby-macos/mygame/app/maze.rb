@@ -32,6 +32,14 @@ class Maze
     Tiles.passable_for?(@chars[gy][gx], role)
   end
 
+  # A tunnel cell sits on a row whose left and right edges both wrap to
+  # walkable space (i.e. the row participates in horizontal toroidal wrap).
+  # Ghosts slow down while their current cell is a tunnel cell.
+  def tunnel?(gx, gy)
+    return false if gy < 0 || gy >= @height
+    Tiles.walkable?(@chars[gy][0]) && Tiles.walkable?(@chars[gy][@width - 1])
+  end
+
   # Toroidal coord normalization on the X axis. Y is not wrapped: maps with
   # vertical tunnels would need the same treatment, but current layouts cap
   # top/bottom rows with solid wall.

@@ -1,5 +1,5 @@
 class FrightenedTimer
-  DURATION_TICKS = 600 # 10s @ 60fps
+  DURATION_TICKS = 360 # 6s @ 60fps (OG Lvl 1)
 
   attr_reader :remaining
 

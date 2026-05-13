@@ -19,10 +19,10 @@ class Ghost
     eaten: "sprites/hexagon/white.png"
   }.freeze
 
-  FRIGHTENED_FLASH_WINDOW = 120 # last 2s @ 60fps
-  FRIGHTENED_FLASH_PERIOD = 15  # alternate every 0.25s (4 on-flashes in 2s)
+  FRIGHTENED_FLASH_WINDOW = 150 # last 2.5s @ 60fps (5 on-flashes window)
+  FRIGHTENED_FLASH_PERIOD = 15  # alternate every 0.25s
 
-  attr_accessor :controller, :frightened_remaining_ticks
+  attr_accessor :controller, :frightened_remaining_ticks, :elroy_state
   attr_reader :state, :identity, :scatter_target, :spawn_cell
 
   def state=(new_state)
@@ -47,6 +47,7 @@ class Ghost
     @sprite_offset_x = sprite_offset_x || (w * @sprite_scale - w) / 2.0
     @sprite_offset_y = sprite_offset_y || (h * @sprite_scale - h) / 2.0
     @frightened_remaining_ticks = 0
+    @elroy_state = :off
   end
 
   def base_speed

@@ -29,6 +29,17 @@ class Player
     @commit_target_tick = 0.0
     @commit_duration_ticks = 1.0
     @rhythm_fallback = false
+    @dot_slow_remaining_ticks = 0
+  end
+
+  # OG Lvl 1: Pac slows to 0.9× while munching a dot (arcade = 1-frame skip
+  # per pellet). Applied as a post-multiplier so it co-exists with the
+  # rhythm commit ramp without re-syncing the beat clock.
+  DOT_SLOW_TICKS = 4
+  DOT_SLOW_FACTOR = 0.9
+
+  def on_dot_eaten
+    @dot_slow_remaining_ticks = DOT_SLOW_TICKS
   end
 
   def configure_rhythm(enabled:, bpm:, grace_ticks: 3)
@@ -68,6 +79,7 @@ class Player
     end
 
     apply_commit_speed(tick_count)
+    apply_dot_slow
     advance(maze, projection)
   end
 
@@ -83,8 +95,15 @@ class Player
 
   def update_immediate(intent:, maze:, projection:)
     @speed = @base_speed
+    apply_dot_slow
     try_turn(intent, maze, projection)
     advance(maze, projection)
+  end
+
+  def apply_dot_slow
+    return if @dot_slow_remaining_ticks <= 0
+    @speed *= DOT_SLOW_FACTOR
+    @dot_slow_remaining_ticks -= 1
   end
 
   def committing?
