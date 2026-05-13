@@ -15,7 +15,7 @@ module MapLayouts
     %w(wwwwwRv.vv____b_____vv.vLwwwww),
     %w(wBBBB8v.vv_1hh--hh2_vv.v7BBBBw),
     %w(whhhhh4.34_v5T__T6v_34.3hhhhhw),
-    %w(_______.___vLippcRv___._______),
+    %w(ttttttt.___vLippcRv___.ttttttt),
     %w(whhhhh2.12_v7BBBB8v_12.1hhhhhw),
     %w(wTTTT6v.vv_3hhhhhh4_vv.v5TTTTw),
     %w(wwwwwRv.vv__________vv.vLwwwww),

@@ -7,6 +7,7 @@ module Tiles
   PELLET       = "."
   POWER_PELLET = "o"
   EMPTY        = "_"
+  TUNNEL       = "t"
   DOOR         = "-"
   GHOST_HOME   = "G"
 
@@ -17,7 +18,7 @@ module Tiles
   SPAWN_PLAYER = "P"
   SPAWN_MARKERS = [SPAWN_BLINKY, SPAWN_PINKY, SPAWN_INKY, SPAWN_CLYDE, SPAWN_PLAYER].freeze
 
-  WALKABLE = [PELLET, POWER_PELLET, EMPTY, GHOST_HOME, *SPAWN_MARKERS].freeze
+  WALKABLE = [PELLET, POWER_PELLET, EMPTY, TUNNEL, GHOST_HOME, *SPAWN_MARKERS].freeze
 
   ROLE_DEFAULT       = :default
   ROLE_GHOST_EATEN   = :ghost_eaten

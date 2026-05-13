@@ -33,9 +33,7 @@ class Maze
     Tiles.passable_for?(@chars[gy][gx], role)
   end
 
-  # A tunnel cell is a walkable cell on a wrap-row that's reachable from
-  # the wrap edge via an unbroken walkable run along its row. The interior
-  # of the wrap-row (separated from the edges by walls) is NOT tunnel.
+  # Tunnel cells are explicitly marked with Tiles::TUNNEL ("t") in the layout.
   # Ghosts slow down while their current cell is a tunnel cell.
   def tunnel?(gx, gy)
     @tunnel_cells.include?([gx, gy])
@@ -44,16 +42,8 @@ class Maze
   def compute_tunnel_cells
     cells = {}
     @height.times do |gy|
-      next unless Tiles.walkable?(@chars[gy][0]) && Tiles.walkable?(@chars[gy][@width - 1])
-      gx = 0
-      while gx < @width && Tiles.walkable?(@chars[gy][gx])
-        cells[[gx, gy]] = true
-        gx += 1
-      end
-      gx = @width - 1
-      while gx >= 0 && Tiles.walkable?(@chars[gy][gx])
-        cells[[gx, gy]] = true
-        gx -= 1
+      @width.times do |gx|
+        cells[[gx, gy]] = true if @chars[gy][gx] == Tiles::TUNNEL
       end
     end
     cells

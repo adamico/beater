@@ -9,7 +9,8 @@ emit these chars; runtime modules read them.
 |------|----------------------|----------|------------|----------------------------------------|
 | `.`  | Regular pellet       | yes      | `:pellet`  | Default for corridor floor              |
 | `o`  | Power pellet         | yes      | `:power`   | Larger pellet, ghost-fright timer       |
-| `_`  | Empty floor          | yes      | none       | Tunnel mouths, ghost house, spawn area  |
+| `_`  | Empty floor          | yes      | none       | Ghost house, spawn area, tunnel approach |
+| `t`  | Tunnel floor         | yes      | none       | Marks ghost-slowdown zone (`Maze#tunnel?`) |
 | `-`  | Ghost-house door     | role     | none       | Walkable only for `:ghost_eaten` (down) and `:ghost_leaving` (up); wall to player + active ghosts |
 | `G`  | Ghost-house home cell| yes      | none       | Reserved anchor cell (currently unused; identities use individual marker chars below) |
 | `b`  | Blinky spawn         | yes      | none       | Spawn marker. Anchor = leftmost occurrence (sprite is 2 tiles wide). |
@@ -117,4 +118,4 @@ Two layers:
 - **Topology**: `Maze#walkable?` wraps `gx`, so probes across the seam see the cell on the other side. The grid is toroidal on X.
 - **Pixel motion**: `GridMover#advance` teleports `@x` once the rect has fully exited the playfield horizontally (`x + w <= playfield_left` or `x >= playfield_right`). Actor is briefly invisible during transit; `Renderer` skips draw for fully-off-playfield rects.
 
-No tunnel char in the alphabet — tunnels are implicit by edge-adjacency.
+**Slowdown** is explicit: tiles authored as `t` flag tunnel cells consumed by `Maze#tunnel?`. `Game#effective_ghost_speed` returns `GHOST_TUNNEL_SPEED` (0.4× player) for any ghost whose current cell is `tunnel?`, taking precedence over frightened/elroy. Eaten ghosts skip the lookup. Topology and pixel motion stay unchanged — only `t`-marked cells slow ghosts. See ADR-0005.
