@@ -125,11 +125,15 @@ class Game
 
   def initialize_ghosts
     bounds = @maze.visible_cell_bounds
+    # OG-style off-map scatter targets: unreachable points beyond each
+    # corner so ghosts orbit the corner rather than settling on it. With
+    # on-map targets they oscillate between the two corridor intersections
+    # adjacent to the corner cell instead of taking the vertical path.
     scatter_targets = {
-      blinky: [bounds[:gx1], bounds[:gy1]],
-      pinky:  [bounds[:gx0], bounds[:gy1]],
-      inky:   [bounds[:gx1], bounds[:gy0]],
-      clyde:  [bounds[:gx0], bounds[:gy0]]
+      blinky: [bounds[:gx1],     bounds[:gy1] + 3],
+      pinky:  [bounds[:gx0],     bounds[:gy1] + 3],
+      inky:   [bounds[:gx1],     bounds[:gy0] - 3],
+      clyde:  [bounds[:gx0],     bounds[:gy0] - 3]
     }
 
     @ghosts = Ghost::IDENTITIES.map do |id|

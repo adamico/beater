@@ -22,6 +22,7 @@ module GhostControllers
     TIE_BREAK_ORDER = [Direction::UP, Direction::LEFT, Direction::DOWN, Direction::RIGHT].freeze
 
     @last_log_tick = {}
+    @cell_trails = Hash.new { |h, k| h[k] = [] }
 
     def self.next_direction(ghost, world, target_tile)
       return Direction::NONE unless GhostControllers.at_decision_point?(ghost, world.projection)
@@ -32,12 +33,14 @@ module GhostControllers
       best = nil
       best_dist = nil
       walk_map = {}
+      dist_map = {}
       candidates.each do |d|
         nx, ny = gx + d.dx, gy + d.dy
         walkable = world.maze.walkable?(nx, ny, role: ghost.role)
         walk_map[d.name] = walkable
         next unless walkable
         dist = (nx - target_tile[0])**2 + (ny - target_tile[1])**2
+        dist_map[d.name] = dist
         if best_dist.nil? || dist < best_dist
           best = d
           best_dist = dist
@@ -49,7 +52,31 @@ module GhostControllers
         return ghost.direction.opposite
       end
 
+      log_scatter_decision(ghost, gx, gy, target_tile, walk_map, dist_map, best)
       best
+    end
+
+    def self.log_scatter_decision(ghost, gx, gy, target_tile, walk_map, dist_map, chosen)
+      return unless ghost.state == :scatter
+      return unless ghost.identity == :blinky || ghost.identity == :pinky
+
+      trail = @cell_trails[ghost.identity]
+      trail << [gx, gy]
+      trail.shift while trail.size > 8
+
+      reverse = ghost.direction.opposite
+      cand = TIE_BREAK_ORDER.map { |d|
+        if d == reverse
+          [d.name, "rev"]
+        else
+          w = walk_map[d.name]
+          [d.name, w ? "w:#{dist_map[d.name]}" : "x"]
+        end
+      }.to_h
+
+      puts "[GHOST SCATTER] tick=#{Kernel.tick_count} id=#{ghost.identity} " \
+           "cell=(#{gx},#{gy}) dir=#{ghost.direction.name} target=#{target_tile.inspect} " \
+           "cand=#{cand.inspect} chose=#{chosen.name} trail=#{trail.inspect}"
     end
 
     def self.log_phantom_reverse(ghost, world, gx, gy, walk_map)

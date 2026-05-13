@@ -50,6 +50,7 @@ class Ghost
     @elroy_state = :off
     @stuck_ticks = 0
     @stuck_logged = false
+    @last_decision_cell = nil
   end
 
   STUCK_LOG_THRESHOLD = 120 # 2s @ 60fps
@@ -85,7 +86,19 @@ class Ghost
 
     old_x = @x
     old_y = @y
-    try_turn(intent, maze, projection) unless intent.none?
+
+    # OG-style one-decision-per-cell latch. at_decision_point? fires for every
+    # tick within speed-tolerance of cell center, so without this gate a ghost
+    # can flip its direction multiple ticks in a row at the same cell (e.g.
+    # picks LEFT on tick N because DOWN was reverse-excluded, then picks DOWN
+    # on tick N+1 because LEFT became the new reverse). Result: corner-loop
+    # oscillation in scatter mode. Latch on grid_cell change.
+    current_cell = grid_cell(projection)
+    if current_cell != @last_decision_cell && !intent.none?
+      try_turn(intent, maze, projection)
+      @last_decision_cell = current_cell
+    end
+
     advance(maze, projection)
 
     moved = (@x - old_x).abs > GhostControllers::DECISION_EPSILON ||
