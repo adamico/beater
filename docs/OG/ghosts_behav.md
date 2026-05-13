@@ -1,0 +1,88 @@
+## Basics
+
+The premise of Pac-Man is delightfully simple: using a four-way joystick, the player guides Pac-Man—up, down, left, and right—through a maze filled with dots for him to gobble up. Four ghost monsters are also in the maze and chase after our hero, trying to capture and kill him. The goal is to clear the maze of dots while avoiding the deadly ghosts. Each round starts with the ghosts in the “monster pen” at the center of the maze, emerging from it to join in the chase. If Pac-Man is captured by a ghost, a life is lost, the ghosts are returned to their pen, and a new Pac-Man is placed at the starting position before play continues. When the maze is cleared of all dots, the board is reset, and a new round begins. If Pac-Man gets caught by a ghost when he has no extra lives, the game is over.
+
+There are 244 dots in the maze, and Pac-Man must eat them all in order to proceed to the next round. The 240 small dots are worth ten points each, and the four large, flashing dots—best known as energizers—are worth 50 points each. This yields a total of 2,600 points for clearing the maze of dots each round. Players have two ways to increase their score beyond what is earned from eating dots:
+
+The first way to increase your score each round is by turning the tables on your enemies by making them your prey. Whenever Pac-Man eats one of the four energizer dots located in the corners of the maze, the ghosts reverse their direction and, in early levels, turn the same shade of blue for a short period of time before returning to normal. While blue, they are vulnerable to Pac-Man and can be gobbled up for extra points providing they are caught before the time expires. After being eaten, a ghost's eyes will return to the monster pen where it is resurrected, exiting to chase Pac-Man once again. The first ghost captured after an energizer has been eaten is always worth 200 points. Each additional ghost captured from the same energizer will then be worth twice as many points as the one before it—400, 800, and 1,600 points, respectively. If all four ghosts are captured at all four energizers, an additional 12,000 points can be earned on these earlier levels. This should not prove too terribly difficult to achieve for the first few rounds as the ghosts initially remain blue for several seconds. Soon after, however, the ghosts' “blue time” will get reduced to one or two seconds at the most, making it much more problematic to capture all four before time runs out on these boards. By level 19, the ghosts stop turning blue altogether and can no longer be eaten for additional points.
+
+## Scatter and Chase Modes
+
+Ghosts alternate between scatter and chase modes during gameplay at predetermined intervals. These mode changes are easy to spot as the ghosts reverse direction when they occur. Scatter modes happen four times per level before the ghosts stay in chase mode indefinitely. Good players will take full advantage of the scatter periods by using the brief moment when the ghosts are not chasing Pac-Man to clear dots from the more dangerous areas of the maze. The scatter/chase timer gets reset whenever a life is lost or a level is completed. At the start of a level or after losing a life, ghosts emerge from the ghost pen already in the first of the four scatter modes.
+
+For the first four levels, the first two scatter periods last for seven seconds each. They change to five seconds each for level five and beyond. The third scatter mode is always set to five seconds. The fourth scatter period lasts for five seconds on level one, but then is only 1/60th of a second for the rest of play. When this occurs, it appears as a simple reversal of direction by the ghosts. The first and second chase periods last for 20 seconds each. The third chase period is 20 seconds on level one but then balloons to 1,033 seconds for levels two through four, and 1,037 seconds for all levels beyond—lasting over 17 minutes! If the ghosts enter frightened mode, the scatter/chase timer is paused. When time runs out, they return to the mode they were in before being frightened and the scatter/chase timer resumes. This information is summarized in the following table (all values are in seconds):
+
+
+|Mode|Level 1|Levels 2–4|Levels 5+|
+|---|---|---|---|
+|Scatter 1|7|7|5| 
+|Chase 1|20|20|20|
+|Scatter 2|7|7|5|
+|Chase 2|20|20|20|
+|Scatter 3|5|5|5|
+|Chase 3|20|1033|1037|
+|Scatter 4|5|1/60|1/60|
+|Chase 4|indefinite|indefinite|indefinite|
+
+## Target Tiles
+
+Whenever a ghost is in chase or scatter mode, it is trying to reach a target tile somewhere on (or off) the screen. A target tile is merely a way to describe the tile a ghost would like to occupy at any given moment. This tile can be fixed in place or change location frequently. Whenever the ghosts scatter to the corners of the maze, for example, each ghost is striving to reach a fixed target tile located somewhere near its home corner. In chase mode, the target tile is usually (but not always) related to Pac-Man's current tile which changes often. Although it may not be obvious at first, the only difference between chase and scatter mode to a ghost is where its target tile is located. The same pathfinding logic applies in either case.
+
+## Looking Ahead
+
+Ghosts are always thinking one step into the future as they move through the maze. Whenever a ghost enters a new tile, it looks ahead to the next tile along its current direction of travel and decides which way it will go when it gets there. When it eventually reaches that tile, it will change its direction of travel to whatever it had decided on a tile beforehand. The process is then repeated, looking ahead into the next tile along its new direction of travel and making its next decision on which way to go.
+
+When a ghost looks ahead into the upcoming tile, it must examine the possible exits from that tile to determine a way to proceed. In the picture below, the red ghost has just arrived at tile A and is moving right-to-left. It immediately looks ahead to tile B (the next tile along its direction of travel). Each tile has four potential exits to be considered: right, left, up, and down. In the case of tile B, the up and down exits are blocked by walls and must be discarded as potential candidates. The right exit is also discounted because it would only take the ghost back to tile A again, and ghosts never voluntarily reverse direction. With three of the four possible exits eliminated from tile B, moving left is the only remaining choice.
+
+This example is the most simple to explain as the ghost has but one way it can legally move. As such, we did not have to worry about where its target tile was located. The majority of game tiles in legal space are similar to this one, but things get more interesting when a ghost approaches a tile with more potential exits to choose from.
+
+## Intersections
+
+When a ghost arrives one tile away from an upcoming intersection, it must choose between several possible directions in which to proceed. Consider the following example:
+
+In the first case, the red ghost has just reached tile A and is seeking its target (shown as the green tile). It immediately looks ahead to the subsequent tile along its present direction of travel (up). In this case, that tile is a four-way intersection. As this intersection tile has no walls blocking off any of the exits, the ghost can only discard his reverse direction (down), leaving three exits open for travel. It looks one tile beyond the intersection in each of the three remaining directions, collecting “test tiles” (shown as the tiles with dashed, white lines). In the second case, the ghost triangulates the distance from each of these test tiles to its target tile. Whichever direction's test tile has the shortest distance to the target becomes the direction the ghost will take upon reaching the intersection tile. In this case, the right test tile has the shortest distance to the target, and the ghost updates its chosen direction for the intersection tile accordingly.
+
+Sometimes a ghost is presented with two or more test tiles that have the same distance to the target tile. In the example below, the red ghost must choose between moving down or left at the upcoming intersection tile. Unfortunately, both test tiles have the same distance to the target (bottom left). To break the tie, the ghost prefers directions in this order: up, left, down, right. Up is the most preferred direction; right is the least. Therefore, the ghost chooses to go left at the intersection because left precedes down in the preference list. Although it may seem obvious to a person that going down was the better choice to reach the target, ghosts are not that smart. They cannot see more than a few tiles ahead and, as a consequence, cannot recognize the disparity between these two options.
+
+## Fixed Target Tiles
+
+Each ghost has a fixed target tile it tries to reach while in scatter mode. The picture below shows the physical location of the scatter mode targets used by each ghost (matched to each ghost's color scheme). Notice each target tile is in dead space above or below the actual maze making them impossible for the ghosts to reach. This results in each ghost heading toward the corner of the maze nearest its respective scatter target and then making circles around this area until another mode change occurs. That's all scatter mode really is. The only reason a ghost has a “favorite corner” of the maze at all is due to the location of a fixed target tile it will never reach.
+
+An additional fixed target tile is employed whenever a ghost is eaten by Pac-Man and its disembodied eyes need to return to the ghost house in the center of the maze. This target is located directly above the left side of the “door” to the ghost house.
+
+## Per Ghost Behavior
+
+### Blinky (Red Ghost)
+Of all the ghosts' targeting schemes for chase mode, Blinky's is the most simple and direct, using Pac-Man's current tile as his target. In the pictures above, we can see Blinky's target tile is the same as Pac-Man's currently occupied tile. Targeting Pac-Man directly in this way results in a very determined and tenacious ghost who is tough to shake when he's right behind you.
+
+All ghosts move at the same rate of speed when a level begins, but Blinky will increase his rate of speed twice each round based on the number of dots remaining in the maze (if Pac-Man dies this is not necessarily true - more on this in a moment). While in this accelerated state, Blinky is commonly called “Cruise Elroy”, yet no one seems to know where this custom was originated or what it means. On the first level, for example, Blinky becomes Elroy when there are 20 dots remaining in the maze, accelerating to be at least as fast as Pac-Man. More importantly, his scatter mode behavior is also modified at this time to keep targeting Pac-Man's current tile in lieu of his typical fixed target tile for any remaining scatter periods in the level (he will still reverse direction when entering/exiting a scatter period). This results in Elroy continuing to chase Pac-Man while the other three ghosts head for their corners as normal. As if that weren't bad enough, when only 10 dots remain, Elroy speeds up again to the point where he is now moving faster than Pac-Man. As the levels progress, Blinky will turn into Elroy with more dots remaining in the maze than in previous rounds. Refer to Table A.1 in the appendices for dot counts and speeds for both Elroy changes, per level.
+
+Determining when Blinky turns into Elroy can become more complicated if Pac-Man is killed. The ghosts and Pac-Man are reset to their starting positions whenever a life is lost and, when play continues, Blinky's “Cruise Elroy” abilities are temporarily suspended until the orange ghost (Clyde) stops bouncing up and down inside the ghost house and moves toward the door to exit. Until this happens, Blinky's speed and scatter behavior will remain normal regardless of the number of dots remaining in the maze. Once this temporary restriction is lifted, however, Blinky will resume changing his behavior based on the dot count.
+
+
+### Pinky (Pink Ghost)
+Pinky: Nicknamed “Pinky”, the pink ghost's character is described as one who is speedy. In Japan, he is characterized as machibuse, meaning “to perform an ambush”, perhaps because Pinky always seems to be able to get ahead of you and cut you off when you least expect it. He always moves at the same speed as Inky and Clyde, however, which suggests speedy is a poor translation of the more appropriate machibuse. Pinky and Blinky often seem to be working in concert to box Pac-Man in, leaving him with nowhere to run.
+
+In chase mode, Pinky behaves as he does because he does not target Pac-Man's tile directly. Instead, he selects an offset four tiles away from Pac-Man in the direction Pac-Man is currently moving (with one exception).
+
+If Pac-Man is moving left, Pinky's target tile will be four game tiles to the left of Pac-Man's current tile. If Pac-Man is moving right, Pinky's tile will be four tiles to the right. If Pac-Man is moving down, Pinky's target is four tiles below. Finally, if Pac-Man is moving up, Pinky's target tile will be four tiles up and four tiles to the left. 
+
+### Inky (light-blue Ghost)
+Inky: The light-blue ghost is nicknamed “Inky” and his character is described as one who is bashful. In Japan, he is portrayed as kimagure, meaning “a fickle, moody, or uneven temper”. Perhaps not surprisingly, Inky is the least predictable of the ghosts. Sometimes he chases Pac-Man aggressively like Blinky; other times he jumps ahead of Pac-Man as Pinky would. He might even wander off like Clyde on occasion! In fact, Inky may be the most dangerous ghost of all due to his erratic behavior. Bashful is not a very good translation of kimagure, and misleads the player to assume Inky will shy away from Pac-Man when he gets close which is not always the case.
+
+
+Inky uses the most complex targeting scheme of the four ghosts in chase mode. He needs Pac-Man's current tile/orientation and Blinky's current tile to calculate his final target. To determine Inky's target, we must first establish an intermediate offset two tiles in front of Pac-Man in the direction he is moving (represented by the tile bracketed in green above). Now imagine drawing a vector from the center of the red ghost's current tile to the center of the offset tile, then double the vector length by extending it out just as far again beyond the offset tile. The tile this new, extendend vector points to is Inky's actual target as shown above.
+
+
+### Clyde (Orange Ghost)
+Clyde: The orange ghost is nicknamed “Clyde” and is characterized as one who is pokey. In Japan, his character is described as otoboke, meaning “pretending ignorance”, and his nickname is “Guzuta”, meaning “one who lags behind”. In reality, Clyde moves at the same speed as Inky and Pinky so his character description is a bit misleading. Clyde is the last ghost to leave the pen and tends to separate himself from the other ghosts by shying away from Pac-Man and doing his own thing when he isn't patrolling his corner of the maze. Although not nearly as dangerous as the other three ghosts, his behavior can seem unpredictable at times and should still be considered a threat.
+
+
+During chase mode, Clyde's targeting logic changes based on his proximity to Pac-Man (represented by the green target tile above). He first calculates the Euclidean distance between his tile and Pac-Man's tile. If the distance between them is eight tiles or more, Clyde targets Pac-Man directly just as Blinky does. If the distance between them is less than eight tiles, however, Clyde switches his target to the tile he normally uses during scatter mode and heads for his corner until he gets far enough away to start targeting Pac-Man again. In the picture above, Clyde is stuck in an endless loop (as long as Pac-Man stays where he is) thanks to this scheme. While occupying any tile completely outside the dashed perimeter, Clyde's target is Pac-Man. Upon entering the area, Clyde changes his mind and heads for his scatter target instead. Once he exits the perimeter, his target will change back to Pac-Man's current tile again. The end result is Clyde circling around and around until Pac-Man moves elsewhere or a mode change occurs. Clyde is fairly easy to avoid once you understand his targeting scheme. Just remember: he is still dangerous if you manage to get in his way as he runs back to his corner or before he can reach an intersection to turn away from you.
+
+### Appendix A: Ghost Behavior Details
+Table A.1
+
+|Level|Bonus Symbol|Bonus Points|Pac-Man Speed|Pac-Man Dots Speed|Ghost Speed|Ghost Tunnel Speed|Elroy 1 Dots Left|Elroy 1 Speed|Elroy 2 Dots Left|Elroy 2 Speed|Fright. Pac-Man Speed|Fright Ghost Speed|Fright. Time (in sec.)|nb of Flashes|
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+|1|Cherry|100|1.0|0.9|0.75|0.4|20|0.85|10|0.95|0.5|0.5|6|5|
