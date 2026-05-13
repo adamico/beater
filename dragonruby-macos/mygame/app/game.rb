@@ -17,6 +17,7 @@ require 'app/release_schedule.rb'
 require 'app/ghost_state_machine.rb'
 require 'app/cruise_elroy.rb'
 require 'app/eat_sequencer.rb'
+require 'app/projectile.rb'
 require 'data/maps/pacman_layout.rb'
 
 class Game
@@ -43,6 +44,8 @@ class Game
   GHOST_TUNNEL_SPEED     = PLAYER_SPEED * GHOST_TUNNEL_RATIO
   GHOST_ELROY1_SPEED     = PLAYER_SPEED * GHOST_ELROY1_RATIO
   GHOST_ELROY2_SPEED     = PLAYER_SPEED * GHOST_ELROY2_RATIO
+
+  PROJECTILE_SPEED       = PLAYER_SPEED * 2.0
 
   PRE_EAT_DUCK_LOOKAHEAD_CELLS = 1.5
   PRE_EAT_DUCK_LATERAL_TOL_CELLS = 0.8
@@ -81,6 +84,9 @@ class Game
     @score = 0
     @level_complete = false
     @audio_state_for = nil
+    @projectiles = []
+    @pending_immediate_fire = false
+    @last_fired_tick = nil
     initialize_player
     initialize_ghosts
   end
@@ -213,8 +219,9 @@ class Game
       return
     end
     tick_ghosts(world)
+    tick_projectiles
     tick_collisions
-    @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, popup: @eat_sequencer.popup, level_complete: false)
+    @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, projectiles: @projectiles, popup: @eat_sequencer.popup, level_complete: false)
     draw_audio_debug_watch if args.state.debug_audio
   end
 
@@ -279,6 +286,54 @@ class Game
     @ghosts.each do |g|
       @ghost_fsm.enter_frightened(g, GHOST_FRIGHTENED_SPEED, @frightened_timer.remaining)
     end
+    @pending_immediate_fire = true
+  end
+
+  def tick_projectiles
+    spawn_projectile_if_due
+    @projectiles.each { |p| p.tick(@maze, @projection) }
+    resolve_projectile_hits
+    @projectiles.reject!(&:dead?)
+  end
+
+  def spawn_projectile_if_due
+    tick = args.tick_count
+    fire = false
+    if @pending_immediate_fire
+      fire = true if @frightened_timer.active? && !@player.direction.none?
+      @pending_immediate_fire = false
+    end
+    if !fire && @frightened_timer.active? && !@player.direction.none?
+      if Audio::BeatClock.step_changed?(tick, bpm: LEVEL_BPM)
+        step = Audio::BeatClock.current_step(tick, bpm: LEVEL_BPM)
+        fire = (step % Audio::BeatClock::STEPS_PER_BEAT == 0)
+      end
+    end
+    return unless fire
+    return if @last_fired_tick == tick
+    fire_projectile
+    @last_fired_tick = tick
+  end
+
+  def fire_projectile
+    cx = @player.x + @player.w / 2.0
+    cy = @player.y + @player.h / 2.0
+    @projectiles << Projectile.new(
+      cx: cx, cy: cy, direction: @player.direction, speed: PROJECTILE_SPEED
+    )
+  end
+
+  def resolve_projectile_hits
+    @projectiles.each do |p|
+      next if p.dead?
+      @ghosts.each do |g|
+        next if g.state == :in_house || g.state == :eaten
+        next unless rects_overlap?(p.rect, g.rect)
+        eat_ghost(g) if g.state == :frightened
+        p.kill!
+        break
+      end
+    end
   end
 
   def tick_ghosts(world)
@@ -326,12 +381,8 @@ class Game
     @ghosts.each do |g|
       next if g.state == :in_house || g.state == :eaten
       next unless rects_overlap?(@player.rect, g.rect)
-      if g.state == :frightened
-        eat_ghost(g)
-      else
-        player_dies
-        return
-      end
+      player_dies
+      return
     end
   end
 
@@ -381,6 +432,9 @@ class Game
     @phase_scheduler.reset
     @frightened_timer.reset
     @eat_sequencer.reset
+    @projectiles.clear
+    @pending_immediate_fire = false
+    @last_fired_tick = nil
     reset_ghost_states
   end
 

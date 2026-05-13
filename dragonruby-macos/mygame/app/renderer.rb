@@ -26,11 +26,11 @@ class Renderer
     @projection = projection
   end
 
-  def draw(outputs, maze, pellets, player, ghosts = [], popup: nil, level_complete: false)
+  def draw(outputs, maze, pellets, player, ghosts = [], projectiles: [], popup: nil, level_complete: false)
     outputs.background_color = BACKGROUND
     draw_walls(outputs, maze)
     draw_pellets(outputs, pellets)
-    draw_actors(outputs, maze, player, ghosts)
+    draw_actors(outputs, maze, player, ghosts, projectiles)
     draw_popup(outputs, popup) if popup
     level_complete
   end
@@ -71,12 +71,13 @@ class Renderer
 
   # Render player + ghosts into an off-screen target sized to the visible play
   # area, then blit. The clip hides sprites as they cross the wrap seam.
-  def draw_actors(outputs, maze, player, ghosts)
+  def draw_actors(outputs, maze, player, ghosts, projectiles = [])
     visible = @projection.rect_for_cell_bounds(maze.visible_cell_bounds)
 
     sprites = []
     sprites << player.to_sprite if player
     sprites.concat(ghosts.map(&:to_sprite))
+    sprites.concat(projectiles.map(&:to_sprite))
     clipped = sprites.map { |s| s.merge(x: s[:x] - visible[:x], y: s[:y] - visible[:y]) }
 
     outputs[:clipped_area].background_color = CLIP_BACKGROUND

@@ -6,11 +6,10 @@
 
 ## Visuals
 - maze cell dimensions needs to be tweaked to accomodate for the player sprite size which looks too small at 16:9 resolution
-  
+
 ## Audio
 
 ## Gameplay
-- instead of having the player collide with enemies to kill them, make the player automatically shoot projectiles in the direction they are moving when they collect a power pellet.
   
 ## UI
 
