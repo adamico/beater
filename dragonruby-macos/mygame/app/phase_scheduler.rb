@@ -19,8 +19,7 @@ class PhaseScheduler
     PHASE_TABLE[@phase_index][0]
   end
 
-  def tick(paused:)
-    return if paused
+  def tick
     _, dur = PHASE_TABLE[@phase_index]
     return if dur.nil?
     @phase_ticks += 1

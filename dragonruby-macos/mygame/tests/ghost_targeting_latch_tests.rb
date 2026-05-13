@@ -123,27 +123,3 @@ def test_update_clears_targeting_latch_on_no_move args, assert
   assert.equal! latched, nil
 end
 
-# Regression for the frightened-stuck bug: a ghost at an intersection with its
-# forward direction blocked must get a non-NONE, non-reverse lateral move from
-# Frightened (i.e. Frightened never relied on the removed update-level latch).
-def test_frightened_unsticks_when_forward_blocked args, assert
-  # At (1,1), UP open, DOWN blocked (wall below), LEFT open, RIGHT open.
-  #   .w.
-  #   ...
-  #   www
-  layout = [
-    %w(.w.),
-    %w(...),
-    %w(www)
-  ]
-  world = make_latch_world(layout)
-  ghost = LatchDummyGhost.new(1, 1, Direction::DOWN, identity: :test_stuck)
-  ctrl = GhostControllers::Frightened.new
-
-  10.times do
-    dir = ctrl.next_direction(world, ghost)
-    # Must escape laterally: never NONE, never DOWN (forward, blocked),
-    # never UP (reverse of DOWN — excluded while alternatives exist).
-    assert.true!  [Direction::LEFT, Direction::RIGHT].include?(dir)
-  end
-end

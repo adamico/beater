@@ -12,4 +12,17 @@ class KeyboardController
     return Direction::LEFT  if inputs.left_right < 0
     Direction::NONE
   end
+
+  # Edge-triggered fire input. True on the tick Space or the controller's
+  # south button transitions from up to down.
+  def fire_pressed?(world)
+    inputs = world.inputs
+    return false unless inputs
+    kb = inputs.keyboard&.key_down
+    c1 = inputs.controller_one&.key_down
+    return true if kb && kb.respond_to?(:space) && kb.space
+    return true if c1 && c1.respond_to?(:a) && c1.a
+    return true if c1 && c1.respond_to?(:button_a) && c1.button_a
+    false
+  end
 end

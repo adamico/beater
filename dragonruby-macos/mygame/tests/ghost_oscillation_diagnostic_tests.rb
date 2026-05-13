@@ -14,7 +14,6 @@ end
 def tick_ghost_system(game)
   game.tick_phase
   game.tick_releases
-  game.tick_frightened
   game.tick_ghosts(build_world_for_oscillation(game))
 end
 
@@ -31,7 +30,7 @@ def test_detect_two_tile_ghost_oscillation args, assert
     tick_ghost_system(game)
 
     ghosts.each do |g|
-      next if g.state == :in_house || g.state == :frightened
+      next if g.state == :in_house
 
       gx, gy = g.grid_cell(projection)
       key = g.object_id
@@ -93,8 +92,8 @@ def test_detect_two_tile_ghost_oscillation args, assert
       puts "tick=#{e[:tick]} state=#{e[:state]} dir=#{e[:dir]} cell=#{e[:cell].inspect} pos=(#{e[:pos][0].round(3)},#{e[:pos][1].round(3)}) err=(#{e[:err][0].round(3)},#{e[:err][1].round(3)})"
     end
   else
-    puts 'No 2-tile oscillation detected over 1200 ticks (non-frightened ghosts).'
+    puts 'No 2-tile oscillation detected over 1200 ticks.'
   end
 
-  assert.nil! oscillation, 'Detected non-frightened ghost oscillation between two tiles'
+  assert.nil! oscillation, 'Detected ghost oscillation between two tiles'
 end

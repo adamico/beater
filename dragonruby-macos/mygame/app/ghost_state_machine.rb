@@ -17,24 +17,6 @@ class GhostStateMachine
     ghost.face(Direction::UP)
   end
 
-  def enter_frightened(ghost, frightened_speed, remaining_ticks)
-    return unless ghost.state == :scatter || ghost.state == :chase
-    ghost.state = :frightened
-    ghost.controller = GhostControllers::Frightened.new
-    ghost.speed = frightened_speed
-    ghost.frightened_remaining_ticks = remaining_ticks
-    ghost.face(ghost.direction.opposite) unless ghost.direction.none?
-  end
-
-  def restore_from_frightened(ghost)
-    return unless ghost.state == :frightened
-    ghost.state = @current_mode_fn.call
-    ghost.controller = GhostControllers.for(ghost.identity)
-    ghost.speed = ghost.base_speed
-    snap_to_cell(ghost)
-    GhostControllers::Targeting.clear_latch(ghost.identity)
-  end
-
   def enter_eaten(ghost)
     ghost.state = :eaten
     ghost.role = Tiles::ROLE_GHOST_EATEN
@@ -66,10 +48,10 @@ class GhostStateMachine
     end
   end
 
-  # Frightened ghosts run at odd speed (1) so pixel position can fall off the
-  # integer-cell-aligned grid. When transitioning to a state whose speed is
-  # even, that drift would prevent at_cell_center? from ever firing again,
-  # freezing turning decisions. Snap on entry to fix.
+  # Snap a ghost's pixel position to its current cell center. Used on
+  # :eaten entry where the ghost's pre-state speed may have drifted it off
+  # the integer-aligned grid; without the snap, at_cell_center? can never
+  # fire again and turning decisions freeze.
   def snap_to_cell(ghost)
     cs = @projection.cell_size
     ghost.x = ((ghost.x - @projection.offset_x) / cs).round * cs + @projection.offset_x

@@ -120,10 +120,6 @@ class AudioSpy
     @duck_active = active
   end
 
-  def on_ghost_eat_imminent(args, imminent:)
-    set_duck(args, active: imminent, gain_scale: 0.4, ramp_in: 1, ramp_out: 2)
-  end
-
   def on_ghost_eat_freeze_begin(args)
     set_duck(args, active: true, gain_scale: 0.4, ramp_in: 1, ramp_out: 2, immediate: true)
   end
@@ -246,15 +242,18 @@ def test_tick_duck_inactive_during_normal_play args, assert
   game.instance_variable_get(:@eat_sequencer).eat_pause_ticks = 0
 
   game.define_singleton_method(:tick_phase) {}
-  game.define_singleton_method(:tick_frightened) {}
   game.define_singleton_method(:tick_releases) {}
   game.define_singleton_method(:tick_player) { |_world| }
   game.define_singleton_method(:tick_ghosts) { |_world| }
+  game.define_singleton_method(:tick_fire_input) { |_world| }
+  game.define_singleton_method(:tick_projectiles) {}
   game.define_singleton_method(:tick_collisions) {}
 
   game.tick
 
-  assert.true! audio.duck_calls.any? { |call| !call[:active] }
+  # Eat-pause duck path is the only remaining duck path; with eat_pause_ticks=0
+  # nothing should drive the duck. Assert no active duck calls occurred.
+  assert.false! audio.duck_calls.any? { |call| call[:active] }
 end
 
 def force_legacy_audio_backend!

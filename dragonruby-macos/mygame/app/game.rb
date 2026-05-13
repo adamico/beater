@@ -12,7 +12,6 @@ require 'app/world.rb'
 require 'app/renderer.rb'
 require 'app/audio/beat_clock.rb'
 require 'app/phase_scheduler.rb'
-require 'app/frightened_timer.rb'
 require 'app/release_schedule.rb'
 require 'app/ghost_state_machine.rb'
 require 'app/cruise_elroy.rb'
@@ -34,21 +33,16 @@ class Game
   PLAYER_SPEED = CELL_SIZE / FRAMES_PER_CELL
 
   GHOST_SPEED_RATIO      = 0.75 # OG Lvl 1
-  GHOST_FRIGHTENED_RATIO = 0.5
   GHOST_TUNNEL_RATIO     = 0.4  # OG Lvl 1 (in tunnel row)
   GHOST_ELROY1_RATIO     = 0.85
   GHOST_ELROY2_RATIO     = 0.95
 
   GHOST_SPEED            = PLAYER_SPEED * GHOST_SPEED_RATIO
-  GHOST_FRIGHTENED_SPEED = PLAYER_SPEED * GHOST_FRIGHTENED_RATIO
   GHOST_TUNNEL_SPEED     = PLAYER_SPEED * GHOST_TUNNEL_RATIO
   GHOST_ELROY1_SPEED     = PLAYER_SPEED * GHOST_ELROY1_RATIO
   GHOST_ELROY2_SPEED     = PLAYER_SPEED * GHOST_ELROY2_RATIO
 
   PROJECTILE_SPEED       = PLAYER_SPEED * 2.0
-
-  PRE_EAT_DUCK_LOOKAHEAD_CELLS = 1.5
-  PRE_EAT_DUCK_LATERAL_TOL_CELLS = 0.8
 
   STEP_INPUT_GRACE_TICKS = 3
 
@@ -72,7 +66,6 @@ class Game
     @above_door_cell = @spawn_cells[:blinky]
 
     @phase_scheduler = PhaseScheduler.new { |mode| apply_phase_to_ghosts(mode) }
-    @frightened_timer = FrightenedTimer.new { restore_ghosts_from_frightened }
     @release_schedule = ReleaseSchedule.new
     @ghost_fsm = GhostStateMachine.new(
       projection: @projection,
@@ -85,8 +78,6 @@ class Game
     @level_complete = false
     @audio_state_for = nil
     @projectiles = []
-    @pending_immediate_fire = false
-    @last_fired_tick = nil
     initialize_player
     initialize_ghosts
   end
@@ -199,7 +190,6 @@ class Game
     end
 
     tick_phase
-    tick_frightened
     tick_releases
 
     world = World.new(
@@ -212,13 +202,13 @@ class Game
     )
 
     tick_player(world)
-    args.state.audio.on_ghost_eat_imminent(args, imminent: ghost_eat_imminent?)
     if check_level_complete
       @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, popup: @eat_sequencer.popup, level_complete: true)
       draw_audio_debug_watch if args.state.debug_audio
       return
     end
     tick_ghosts(world)
+    tick_fire_input(world)
     tick_projectiles
     tick_collisions
     @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, projectiles: @projectiles, popup: @eat_sequencer.popup, level_complete: false)
@@ -226,22 +216,11 @@ class Game
   end
 
   def tick_phase
-    @phase_scheduler.tick(paused: @frightened_timer.active?)
+    @phase_scheduler.tick
   end
 
   def apply_phase_to_ghosts(mode)
     @ghosts.each { |g| @ghost_fsm.apply_phase(g, mode) }
-  end
-
-  def tick_frightened
-    @frightened_timer.tick do |remaining|
-      @ghosts.each { |g| g.frightened_remaining_ticks = remaining if g.state == :frightened }
-    end
-  end
-
-  def restore_ghosts_from_frightened
-    @ghosts.each { |g| @ghost_fsm.restore_from_frightened(g) }
-    @eat_sequencer.reset_chain
   end
 
   def tick_releases
@@ -273,46 +252,25 @@ class Game
       @score += (kind == :power ? 50 : 10)
       if kind == :power
         args.state.audio.on_power_pellet(args)
-        trigger_frightened
+        @player.gain_ammo
       else
         args.state.audio.on_dot_collected(args, entry[:color])
       end
     end
   end
 
-  def trigger_frightened
-    @frightened_timer.trigger
-    @eat_sequencer.reset_chain
-    @ghosts.each do |g|
-      @ghost_fsm.enter_frightened(g, GHOST_FRIGHTENED_SPEED, @frightened_timer.remaining)
-    end
-    @pending_immediate_fire = true
+  def tick_fire_input(world)
+    return unless @player.controller.respond_to?(:fire_pressed?)
+    return unless @player.controller.fire_pressed?(world)
+    return if @player.direction.none?
+    return unless @player.consume_ammo!
+    fire_projectile
   end
 
   def tick_projectiles
-    spawn_projectile_if_due
     @projectiles.each { |p| p.tick(@maze, @projection) }
     resolve_projectile_hits
     @projectiles.reject!(&:dead?)
-  end
-
-  def spawn_projectile_if_due
-    tick = args.tick_count
-    fire = false
-    if @pending_immediate_fire
-      fire = true if @frightened_timer.active? && !@player.direction.none?
-      @pending_immediate_fire = false
-    end
-    if !fire && @frightened_timer.active? && !@player.direction.none?
-      if Audio::BeatClock.step_changed?(tick, bpm: LEVEL_BPM)
-        step = Audio::BeatClock.current_step(tick, bpm: LEVEL_BPM)
-        fire = (step % Audio::BeatClock::STEPS_PER_BEAT == 0)
-      end
-    end
-    return unless fire
-    return if @last_fired_tick == tick
-    fire_projectile
-    @last_fired_tick = tick
   end
 
   def fire_projectile
@@ -329,7 +287,7 @@ class Game
       @ghosts.each do |g|
         next if g.state == :in_house || g.state == :eaten
         next unless rects_overlap?(p.rect, g.rect)
-        eat_ghost(g) if g.state == :frightened
+        eat_ghost(g)
         p.kill!
         break
       end
@@ -367,7 +325,6 @@ class Game
   def effective_ghost_speed(g)
     gx, gy = g.grid_cell(@projection)
     return GHOST_TUNNEL_SPEED if @maze.tunnel?(gx, gy)
-    return GHOST_FRIGHTENED_SPEED if g.state == :frightened
     if g.identity == :blinky
       case g.elroy_state
       when :elroy2 then return GHOST_ELROY2_SPEED
@@ -390,33 +347,6 @@ class Game
     @score += @eat_sequencer.on_ghost_eaten(args, ghost)
   end
 
-  def ghost_eat_imminent?
-    dir = @player.direction
-    return false if dir.none?
-
-    lookahead = CELL_SIZE * PRE_EAT_DUCK_LOOKAHEAD_CELLS
-    lateral_tol = CELL_SIZE * PRE_EAT_DUCK_LATERAL_TOL_CELLS
-
-    px = @player.x + @player.w / 2.0
-    py = @player.y + @player.h / 2.0
-
-    @ghosts.any? do |g|
-      next false unless g.state == :frightened
-
-      gx = g.x + g.w / 2.0
-      gy = g.y + g.h / 2.0
-
-      rel_x = gx - px
-      rel_y = gy - py
-      forward = rel_x * dir.dx + rel_y * dir.dy
-
-      next false if forward < 0 || forward > lookahead
-
-      lateral = dir.horizontal? ? rel_y.abs : rel_x.abs
-      lateral <= lateral_tol
-    end
-  end
-
   def player_dies
     spawn = @projection.cell_rect(*@player_spawn)
     @player.x = spawn[:x]
@@ -430,11 +360,8 @@ class Game
       g.y = rect[:y]
     end
     @phase_scheduler.reset
-    @frightened_timer.reset
     @eat_sequencer.reset
     @projectiles.clear
-    @pending_immediate_fire = false
-    @last_fired_tick = nil
     reset_ghost_states
   end
 
@@ -464,6 +391,8 @@ class Game
     return false if @level_complete || @pellets.remaining != 0
 
     @level_complete = true
+    @projectiles.clear
+    @player.reset_ammo!
     args.state.audio.on_level_complete_duck_clear(args)
     args.state.audio.on_level_complete(args)
     true

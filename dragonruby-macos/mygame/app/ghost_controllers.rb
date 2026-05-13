@@ -209,29 +209,6 @@ module GhostControllers
     end
   end
 
-  class Frightened
-    def next_direction(world, ghost)
-      return Direction::NONE unless GhostControllers.at_decision_point?(ghost, world.projection)
-      gx, gy = ghost.grid_cell(world.projection)
-      # Prefer non-reverse walkable directions
-      candidates = Direction::ALL_MOVING.reject { |d| d == ghost.direction.opposite }
-      walkable = candidates.select { |d| world.maze.walkable?(gx + d.dx, gy + d.dy, role: ghost.role) }
-      if !walkable.empty?
-        return walkable.sample
-      end
-      # If no non-reverse walkable, try reverse if it's walkable
-      reverse = ghost.direction.opposite
-      if world.maze.walkable?(gx + reverse.dx, gy + reverse.dy, role: ghost.role)
-        return reverse
-      end
-      # As a last resort, try any walkable direction (including reverse)
-      all_walkable = Direction::ALL_MOVING.select { |d| world.maze.walkable?(gx + d.dx, gy + d.dy, role: ghost.role) }
-      return all_walkable.sample unless all_walkable.empty?
-      # Truly stuck: surrounded by walls
-      Direction::NONE
-    end
-  end
-
   # BFS-based shortest-path targeting. Used by Eaten + LeavingHouse where
   # correctness matters (greedy Euclidean breaks across tunnel wrap and dead-
   # end corridors). Chase/scatter stay greedy on purpose — that's the arcade

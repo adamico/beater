@@ -22,6 +22,13 @@ class Renderer
   PELLET_SIZE       = 4
   POWER_PELLET_SIZE = 16
 
+  HUD_AMMO_ICON_SIZE = 24
+  HUD_AMMO_ICON_GAP  = 4
+  HUD_AMMO_ICON_MAX_VISIBLE = 5
+  HUD_AMMO_PATH = "sprites/bullet.png"
+  HUD_AMMO_PLUS_COLOR = { r: 255, g: 220, b: 110 }.freeze
+  HUD_AMMO_MARGIN_Y = 8
+
   def initialize(projection)
     @projection = projection
   end
@@ -31,8 +38,38 @@ class Renderer
     draw_walls(outputs, maze)
     draw_pellets(outputs, pellets)
     draw_actors(outputs, maze, player, ghosts, projectiles)
+    draw_hud_ammo(outputs, maze, player) if player
     draw_popup(outputs, popup) if popup
     level_complete
+  end
+
+  def draw_hud_ammo(outputs, maze, player)
+    return unless player.respond_to?(:ammo)
+    ammo = player.ammo
+    visible = [ammo, HUD_AMMO_ICON_MAX_VISIBLE].min
+    visible_band = @projection.rect_for_cell_bounds(maze.visible_cell_bounds)
+    base_x = visible_band[:x]
+    base_y = visible_band[:y] - HUD_AMMO_ICON_SIZE - HUD_AMMO_MARGIN_Y
+
+    sprites = []
+    visible.times do |i|
+      sprites << {
+        x: base_x + i * (HUD_AMMO_ICON_SIZE + HUD_AMMO_ICON_GAP),
+        y: base_y,
+        w: HUD_AMMO_ICON_SIZE, h: HUD_AMMO_ICON_SIZE,
+        path: HUD_AMMO_PATH
+      }
+    end
+    outputs.sprites << sprites
+
+    if ammo > HUD_AMMO_ICON_MAX_VISIBLE
+      plus_x = base_x + visible * (HUD_AMMO_ICON_SIZE + HUD_AMMO_ICON_GAP)
+      outputs.labels << {
+        x: plus_x, y: base_y + HUD_AMMO_ICON_SIZE,
+        text: "+", size_enum: 4,
+        **HUD_AMMO_PLUS_COLOR
+      }
+    end
   end
 
   def draw_popup(outputs, popup)

@@ -12,7 +12,9 @@ class Player
   PLAYER_SPRITE_SCALE = 1.2
 
   attr_accessor :controller
-  attr_reader :move_state, :commit_direction, :rhythm_fallback
+  attr_reader :move_state, :commit_direction, :rhythm_fallback, :ammo
+
+  AMMO_PER_POWER_PELLET = 5
 
   def initialize(x:, y:, w:, h:, speed:, controller:, direction: Direction::NONE)
     init_grid_mover(x: x, y: y, w: w, h: h, speed: speed, direction: direction)
@@ -41,6 +43,21 @@ class Player
     @visual_offset_x = 0.0
     @visual_offset_y = 0.0
     @walk_ticks = 0
+    @ammo = 0
+  end
+
+  def gain_ammo(n = AMMO_PER_POWER_PELLET)
+    @ammo += n
+  end
+
+  def consume_ammo!
+    return false if @ammo <= 0
+    @ammo -= 1
+    true
+  end
+
+  def reset_ammo!
+    @ammo = 0
   end
 
   WALK_FRAME_START = 3
