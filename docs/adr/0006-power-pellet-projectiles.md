@@ -1,5 +1,8 @@
 # Power pellet fires projectiles; body-contact is always fatal
 
+> **Superseded by [ADR-0007](0007-finite-ammo-manual-fire.md).** The auto-fire-on-downbeat / frightened-window model captured here is replaced by a manually-fired finite-ammo model with the frightened ghost state removed entirely.
+
+
 In OG Pac-Man, a power pellet flips ghosts to frightened and the player kills them by walking into them. We diverge: while the frightened window is active the player automatically emits projectiles in the direction of travel, and projectiles are the only way to kill a frightened ghost. Body-contact with any ghost — frightened or not — kills the player.
 
 The mechanic plays to the rhythm hook. Firing cadence is locked to the beat clock (`Audio::BeatClock`): one shot on each downbeat (`step % STEPS_PER_BEAT == 0`) for the duration of the frightened timer, plus one immediate shot on pellet pickup so the input feedback is not delayed by up to a beat. Projectile motion itself is plain pixel-per-tick (2× player speed); only the firing cadence is musical. Projectiles obey maze passability the same as the player: walls stop them, tunnels wrap them toroidally. They despawn on wall hit or any ghost hit. Hitting a frightened ghost routes through the existing `EatSequencer.on_ghost_eaten`, preserving the 200/400/800/1600 chain and the eat-freeze. Non-frightened ghosts consume the projectile with no effect; eaten ghosts (eyes returning home) are passed through.

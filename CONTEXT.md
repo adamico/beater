@@ -4,17 +4,21 @@ Maze chase game with a rhythm hook. Diverges from OG Pac-Man where called out. A
 
 ## Terms
 
-- **Frightened window** — the timed state opened by a power pellet during which ghosts flee and the player can kill them. Length owned by `FrightenedTimer`. In Beater, this is also the *armed window* for the player's auto-fire (see [Projectile](#projectile-fire)).
+- **Ammo** — integer count of bullets the player currently holds. Starts at 0 on each new level, increases by `AMMO_PER_POWER_PELLET` (= 5) per power-pellet pickup, no cap. Decremented by 1 per fired bullet. Carries across player death; resets to 0 on level complete. See [ADR-0007](docs/adr/0007-finite-ammo-manual-fire.md).
 
-- **Projectile / fire** — while the frightened window is active, the player automatically emits one projectile per downbeat (and one immediately on pellet pickup), travelling in `player.direction`. Projectiles obey maze passability — walls stop, tunnels wrap. They despawn on wall hit or any ghost hit. Frightened-ghost hit routes through `EatSequencer.on_ghost_eaten`. Eaten ghosts (eyes-home) are passed through. See [ADR-0006](docs/adr/0006-power-pellet-projectiles.md).
+- **Fire input** — edge-triggered key press (Space / controller south) that spends one ammo and spawns a projectile in the player's current travel direction. No-op when ammo is 0 or `player.direction == NONE`. No rate limit beyond edge-trigger.
 
-- **Body-contact** — overlap between player rect and any ghost rect. Always fatal to the player in Beater, regardless of ghost state. The OG behavior where body-contact eats a frightened ghost is removed; projectiles are the only kill path. See [ADR-0006](docs/adr/0006-power-pellet-projectiles.md).
+- **Empty-mag** — fire input pressed with 0 ammo. Silent no-op; HUD already signals 0 via the icon row.
 
-- **Downbeat** — beat-clock step where `step % STEPS_PER_BEAT == 0`. Quarter-note pulse at the running BPM. The cadence anchor for player auto-fire.
+- **Projectile** — bullet spawned by the fire input. Travels at 2× player speed in the firing direction. Walls stop, tunnels wrap. Despawns on wall hit or any non-(eaten, in-house) ghost contact. A frightened/vulnerable ghost variant no longer exists — bullets kill any active ghost via `EatSequencer.on_ghost_eaten`. In-flight count is uncapped; cleared on player death and level complete. See [ADR-0007](docs/adr/0007-finite-ammo-manual-fire.md).
 
-- **Eat chain** — running multiplier (200 → 400 → 800 → 1600) for consecutive ghost kills within one frightened window. Owned by `EatSequencer`. Resets when the frightened window ends. Multi-kill in a single tick is ordered by projectile spawn age, but in practice the eat-freeze prevents this from compounding.
+- **Body-contact** — overlap between player rect and any non-house, non-eaten ghost rect. Always fatal to the player. Originally introduced in ADR-0006 and unchanged by ADR-0007.
 
-- **Eat freeze** — short pause the game enters when a ghost is killed; popup is shown via `EatSequencer.popup`. Subsequent projectile/ghost contacts cannot resolve during the freeze.
+- **Eat chain** — running multiplier (200 → 400 → 800 → 1600) applied on consecutive ghost kills, owned by `EatSequencer`. Reset boundary is currently unbounded for the level — the frightened-window reset was removed when frightened state was deleted; the planned combo-bonus rework will introduce a time-windowed reset (see [docs/TODO.md](docs/TODO.md) grill backlog).
+
+- **Eat freeze** — short pause the game enters when a ghost is killed; popup is shown via `EatSequencer.popup`. Other contacts cannot resolve during the freeze. Retained under ADR-0007; tuning deferred to playtest.
+
+- **HUD ammo row** — bottom-strip readout: up to 5 bullet icons, with a `+` glyph appended when ammo exceeds 5. Always visible.
 
 - **Tunnel** — explicit `t`-marked cell that slows ghosts and wraps movement toroidally on X. See [ADR-0005](docs/adr/0005-explicit-tunnel-tile.md), [ADR-0001](docs/adr/0001-toroidal-maze-x-axis.md).
 

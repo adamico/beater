@@ -2,6 +2,10 @@
 
 - ghosts are still getting stuck sometimes
 
+# To grill
+
+- rework the "eat" score bonus: instead of the OG 200/400/800/1600 chain tied to a single frightened window, turn it into a time-windowed combo bonus (kill another ghost within T ticks of the last kill to escalate; resets if timer lapses).
+
 # First vertical slice MVP
 
 ## Visuals
@@ -10,7 +14,7 @@
 ## Audio
 
 ## Gameplay
-  
+
 ## UI
 
 - Title screen (with title, background, credits, social, play button)
@@ -42,6 +46,7 @@
 # Future ideas
 
 ## Gameplay
+
 
 - bonus score collectables
 - different maps
