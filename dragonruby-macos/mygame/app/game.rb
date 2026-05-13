@@ -184,7 +184,7 @@ class Game
     @eat_sequencer.tick(args)
     if @eat_sequencer.frozen?
       visible_ghosts = @ghosts.reject { |g| g.state == :eaten && !g.flashing? }
-      @renderer.draw(outputs, @maze, @pellets, nil, visible_ghosts, popup: @eat_sequencer.popup, level_complete: false)
+      @renderer.draw(outputs, @maze, @pellets, @player, visible_ghosts, popup: @eat_sequencer.popup, level_complete: false)
       draw_audio_debug_watch if args.state.debug_audio
       return
     end
@@ -371,7 +371,6 @@ class Game
     return if @audio_state_for == audio_id
 
     args.state.audio.set_dot_totals(dot_totals_by_track)
-    args.state.audio.set_rhythm_bpm(LEVEL_BPM) if args.state.audio.respond_to?(:set_rhythm_bpm)
     @audio_state_for = audio_id
   end
 

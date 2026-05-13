@@ -25,35 +25,21 @@ def count_sfx_entries(args)
   args.audio.keys.count { |k| k.to_s.start_with?("sfx_") }
 end
 
-def test_dot_tick_is_queued_until_step_boundary args, assert
+def test_dot_tick_plays_immediately args, assert
+  # TG4: dot SFX is no longer quantized.
   audio_args = RhythmAudioArgs.new
   manager = Audio::Manager.new(audio_args)
   manager.set_dot_totals(drums: 4, bass: 1, lead: 1, chords: 1)
-  manager.set_rhythm_bpm(120)
 
   manager.on_dot_collected(audio_args, :red)
-
-  audio_args.tick_count = 1
-  manager.tick(audio_args)
-  assert.equal! count_sfx_entries(audio_args), 0
-
-  audio_args.tick_count = 15
-  manager.tick(audio_args)
   assert.equal! count_sfx_entries(audio_args), 1
 end
 
-def test_power_pellet_suppresses_dot_tick_on_same_boundary args, assert
+def test_power_pellet_plays_immediately args, assert
   audio_args = RhythmAudioArgs.new
   manager = Audio::Manager.new(audio_args)
   manager.set_dot_totals(drums: 4, bass: 1, lead: 1, chords: 1)
-  manager.set_rhythm_bpm(120)
 
-  manager.on_dot_collected(audio_args, :red)
   manager.on_power_pellet(audio_args)
-
-  audio_args.tick_count = 15
-  manager.tick(audio_args)
-
-  # One SFX should be emitted (power pellet priority), not both.
   assert.equal! count_sfx_entries(audio_args), 1
 end

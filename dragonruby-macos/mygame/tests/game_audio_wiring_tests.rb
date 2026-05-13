@@ -120,15 +120,6 @@ class AudioSpy
     @duck_active = active
   end
 
-  def on_ghost_eat_freeze_begin(args)
-    set_duck(args, active: true, gain_scale: 0.4, ramp_in: 1, ramp_out: 2, immediate: true)
-  end
-
-  def on_ghost_eat_freeze_tick(args)
-    set_duck(args, active: true, gain_scale: 0.4, ramp_in: 1, ramp_out: 2)
-    :holding
-  end
-
   def on_level_complete_duck_clear(args)
     set_duck(args, active: false, gain_scale: 0.4, ramp_in: 1, ramp_out: 2)
   end
@@ -227,16 +218,7 @@ def test_level_complete_notifies_once args, assert
   assert.equal! audio.level_complete_calls, 1
 end
 
-def test_tick_duck_active_during_eat_pause args, assert
-  game, _args, audio = build_game_with_spy_audio
-
-  game.instance_variable_get(:@eat_sequencer).eat_pause_ticks = 2
-  game.tick
-
-  assert.true! audio.duck_calls.any? { |call| call[:active] }
-end
-
-def test_tick_duck_inactive_during_normal_play args, assert
+def test_tick_no_duck_during_normal_play args, assert
   game, _args, audio = build_game_with_spy_audio
 
   game.instance_variable_get(:@eat_sequencer).eat_pause_ticks = 0
@@ -251,8 +233,7 @@ def test_tick_duck_inactive_during_normal_play args, assert
 
   game.tick
 
-  # Eat-pause duck path is the only remaining duck path; with eat_pause_ticks=0
-  # nothing should drive the duck. Assert no active duck calls occurred.
+  # Eat-duck was removed (TG2): no path should activate the duck during play.
   assert.false! audio.duck_calls.any? { |call| call[:active] }
 end
 

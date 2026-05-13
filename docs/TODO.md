@@ -3,8 +3,6 @@
 # To grill
 
 - TG1: rework the "eat" score bonus: instead of the OG 200/400/800/1600 chain tied to a single frightened window, turn it into a time-windowed combo bonus (kill another ghost within T ticks of the last kill to escalate; resets if timer lapses).
-
-- TG2: reduce the eaten freeze time drastically, it should just add a quick freeze frame for visual feedback but not interrupt the flow of the game
   
 - TG3: - maze cell dimensions needs to be tweaked to accomodate for the player sprite size which looks too small at 16:9 resolution
 
