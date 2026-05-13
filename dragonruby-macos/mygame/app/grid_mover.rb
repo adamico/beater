@@ -39,7 +39,9 @@ module GridMover
       # Snap the abandoned axis so non-integer speeds don't accumulate
       # perpendicular drift across successive turns. Without this, drift can
       # exceed at_cell_center? tolerance and strand the actor at walls.
-      if perpendicular_to_current?(direction)
+      # Player overrides snap_perpendicular_on_turn? to false so it can
+      # phase diagonally toward center (OG cornering) instead of teleporting.
+      if perpendicular_to_current?(direction) && snap_perpendicular_on_turn?
         snapped = snapped_position_for(direction, projection)
         if snapped
           @x = snapped[:x]
@@ -123,10 +125,24 @@ module GridMover
       (direction.horizontal? && @direction.vertical?)
   end
 
+  # Hook: max perpendicular pixels from cell center allowed when committing
+  # a corner. Default = one movement step. Player overrides this to widen
+  # the window for OG-style cornering edge over ghosts.
+  def corner_snap_tolerance
+    @speed.to_f + AXIS_SNAP_EPSILON
+  end
+
+  # Whether to teleport the abandoned axis to cell center on a successful
+  # perpendicular turn. Default true (avoids drift for ghosts). Player
+  # overrides to false to enable OG diagonal cornering.
+  def snap_perpendicular_on_turn?
+    true
+  end
+
   def snapped_position_for(direction, projection)
     return nil unless perpendicular_to_current?(direction)
 
-    snap_tolerance = @speed.to_f + AXIS_SNAP_EPSILON
+    snap_tolerance = corner_snap_tolerance
     cs = projection.cell_size
 
     if direction.vertical?

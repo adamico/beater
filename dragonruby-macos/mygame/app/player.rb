@@ -30,13 +30,79 @@ class Player
     @commit_duration_ticks = 1.0
     @rhythm_fallback = false
     @dot_slow_remaining_ticks = 0
+    @visual_offset_x = 0.0
+    @visual_offset_y = 0.0
   end
+
+  # Px per tick the rendered sprite catches up to the logical position
+  # after a corner snap. Lower = more visible diagonal slide; higher = closer
+  # to instant.
+  VISUAL_OFFSET_DECAY_PX = 1.5
 
   # OG Lvl 1: Pac slows to 0.9× while munching a dot (arcade = 1-frame skip
   # per pellet). Applied as a post-multiplier so it co-exists with the
   # rhythm commit ramp without re-syncing the beat clock.
   DOT_SLOW_TICKS = 4
   DOT_SLOW_FACTOR = 0.9
+
+  # OG-style cornering: Pac may start a turn this many pixels before
+  # reaching cell center. Ghosts keep the default (speed + ε), so Pac
+  # gains a small distance edge through corners. See
+  # docs/OG/ghosts_behav.md "Cornering".
+  CORNER_TOLERANCE_PX = 5.0
+
+  def corner_snap_tolerance
+    CORNER_TOLERANCE_PX
+  end
+
+  def snap_perpendicular_on_turn?
+    false
+  end
+
+  # Wrap GridMover#try_turn so any perpendicular snap (logical jump) gets
+  # absorbed as a visual offset that decays over a few frames. The hitbox
+  # and dot-collection use the logical position; only rendering trails.
+  def try_turn(direction, maze, projection)
+    pre_x, pre_y = @x, @y
+    result = super
+    if result
+      @visual_offset_x -= (@x - pre_x)
+      @visual_offset_y -= (@y - pre_y)
+    end
+    result
+  end
+
+  def decay_visual_offset
+    @visual_offset_x = decay_toward_zero(@visual_offset_x, VISUAL_OFFSET_DECAY_PX)
+    @visual_offset_y = decay_toward_zero(@visual_offset_y, VISUAL_OFFSET_DECAY_PX)
+  end
+
+  def decay_toward_zero(value, step)
+    return 0.0 if value.abs <= step
+    value > 0 ? value - step : value + step
+  end
+
+  # OG diagonal cornering phase: while moving along one axis with a
+  # non-zero offset on the perpendicular axis, nudge the perp axis toward
+  # the cell center each tick (capped at @speed) producing a ~45° diagonal
+  # path until aligned. Replaces the perpendicular snap that ghosts use.
+  def apply_corner_phase(projection)
+    return if @direction.none?
+    cs = projection.cell_size
+    if @direction.vertical?
+      target = ((@x - projection.offset_x) / cs).round * cs + projection.offset_x
+      delta = target - @x
+      return if delta.abs <= AXIS_SNAP_EPSILON
+      step = [@speed.to_f, delta.abs].min
+      @x += delta.positive? ? step : -step
+    elsif @direction.horizontal?
+      target = ((@y - projection.offset_y) / cs).round * cs + projection.offset_y
+      delta = target - @y
+      return if delta.abs <= AXIS_SNAP_EPSILON
+      step = [@speed.to_f, delta.abs].min
+      @y += delta.positive? ? step : -step
+    end
+  end
 
   def on_dot_eaten
     @dot_slow_remaining_ticks = DOT_SLOW_TICKS
@@ -80,12 +146,14 @@ class Player
 
     apply_commit_speed(tick_count)
     apply_dot_slow
+    apply_corner_phase(projection)
     advance(maze, projection)
+    decay_visual_offset
   end
 
   def to_sprite
-    { 
-      x: @x - @sprite_offset, y: @y - @sprite_offset,
+    {
+      x: @x - @sprite_offset + @visual_offset_x, y: @y - @sprite_offset + @visual_offset_y,
       w: @w * @sprite_scale, h: @h * @sprite_scale,
       path: "sprites/circle/yellow.png"
     }
