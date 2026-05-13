@@ -156,6 +156,7 @@ class Game
   def reset_ghost_states
     @release_schedule.reset
     @ghosts.each do |g|
+      GhostControllers::Targeting.clear_latch(g.identity)
       if g.identity == :blinky
         g.state = @phase_scheduler.current_mode
         g.role = Tiles::ROLE_DEFAULT

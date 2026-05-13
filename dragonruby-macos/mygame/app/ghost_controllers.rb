@@ -23,11 +23,25 @@ module GhostControllers
 
     @last_log_tick = {}
     @cell_trails = Hash.new { |h, k| h[k] = [] }
+    # One-decision-per-cell latch. at_decision_point? fires every tick within
+    # speed-tolerance of cell center, and the greedy + reverse-exclusion picker
+    # can flip its choice frame-to-frame at a corner (picks LEFT on tick N
+    # because DOWN was the reverse, then DOWN on tick N+1 because LEFT became
+    # the new reverse) — that produced scatter corner-loop oscillation. Lives
+    # in Targeting only: Frightened (random) and BFS-based controllers don't
+    # have the same hazard and aren't gated.
+    @last_decision_cell = {}
+
+    def self.clear_latch(identity)
+      @last_decision_cell.delete(identity)
+    end
 
     def self.next_direction(ghost, world, target_tile)
       return Direction::NONE unless GhostControllers.at_decision_point?(ghost, world.projection)
 
       gx, gy = ghost.grid_cell(world.projection)
+      return Direction::NONE if @last_decision_cell[ghost.identity] == [gx, gy]
+
       candidates = TIE_BREAK_ORDER.reject { |d| d == ghost.direction.opposite }
 
       best = nil
@@ -49,10 +63,12 @@ module GhostControllers
 
       if best.nil?
         log_phantom_reverse(ghost, world, gx, gy, walk_map)
+        @last_decision_cell[ghost.identity] = [gx, gy]
         return ghost.direction.opposite
       end
 
       log_scatter_decision(ghost, gx, gy, target_tile, walk_map, dist_map, best)
+      @last_decision_cell[ghost.identity] = [gx, gy]
       best
     end
 

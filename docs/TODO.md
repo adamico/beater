@@ -1,11 +1,4 @@
 # Bugs & Tweaks
-- frightened ghost stuck bug is still there:
-
-```shell
-- [Game] [GHOST STUCK] tick=4725 id=blinky state=frightened stuck_ticks=120 pos=(820,140) cell=(25,5) center_err=(0.0,0.0) tol=1.422 at_decision=true dir=down speed=1.422222222222222 role=:default walk={:up=>true, :down=>false, :left=>true, :right=>true}
-- [Game] [GHOST STUCK] tick=4732 id=pinky state=frightened stuck_ticks=120 pos=(520,320) cell=(10,14) center_err=(0.0,0.0) tol=1.422 at_decision=true dir=left speed=1.422222222222222 role=:default walk={:up=>true, :down=>true, :left=>false, :right=>true}
-- [Game] [GHOST STUCK] tick=4732 id=inky state=frightened stuck_ticks=120 pos=(860,80) cell=(27,2) center_err=(0.0,0.0) tol=1.422 at_decision=true dir=down speed=1.422222222222222 role=:default walk={:up=>true, :down=>false, :left=>true, :right=>false}
-```
 
 # First vertical slice MVP
 

@@ -32,6 +32,7 @@ class GhostStateMachine
     ghost.controller = GhostControllers.for(ghost.identity)
     ghost.speed = ghost.base_speed
     snap_to_cell(ghost)
+    GhostControllers::Targeting.clear_latch(ghost.identity)
   end
 
   def enter_eaten(ghost)
@@ -60,6 +61,7 @@ class GhostStateMachine
         ghost.role = Tiles::ROLE_DEFAULT
         ghost.controller = GhostControllers.for(ghost.identity)
         ghost.speed = ghost.base_speed
+        GhostControllers::Targeting.clear_latch(ghost.identity)
       end
     end
   end

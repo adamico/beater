@@ -50,7 +50,6 @@ class Ghost
     @elroy_state = :off
     @stuck_ticks = 0
     @stuck_logged = false
-    @last_decision_cell = nil
   end
 
   STUCK_LOG_THRESHOLD = 120 # 2s @ 60fps
@@ -87,17 +86,10 @@ class Ghost
     old_x = @x
     old_y = @y
 
-    # OG-style one-decision-per-cell latch. at_decision_point? fires for every
-    # tick within speed-tolerance of cell center, so without this gate a ghost
-    # can flip its direction multiple ticks in a row at the same cell (e.g.
-    # picks LEFT on tick N because DOWN was reverse-excluded, then picks DOWN
-    # on tick N+1 because LEFT became the new reverse). Result: corner-loop
-    # oscillation in scatter mode. Latch on grid_cell change.
-    current_cell = grid_cell(projection)
-    if current_cell != @last_decision_cell && !intent.none?
-      try_turn(intent, maze, projection)
-      @last_decision_cell = current_cell
-    end
+    # Controller is responsible for emitting NONE when no new decision is
+    # warranted (e.g. Targeting's one-decision-per-cell latch). Here we just
+    # honor whatever intent the controller produced.
+    try_turn(intent, maze, projection) unless intent.none?
 
     advance(maze, projection)
 
@@ -110,6 +102,13 @@ class Ghost
       snap_to_cell_center!(projection)
     end
 
+    # Ghost couldn't move this tick — release the Targeting one-decision-per-
+    # cell latch so the controller can re-decide next tick. Corner-loop
+    # oscillation (which the latch exists to prevent) requires the ghost to
+    # actually move between cells each tick, so this clear path doesn't
+    # re-open that case.
+    GhostControllers::Targeting.clear_latch(@identity) unless moved
+
     detect_stuck(moved, maze, projection, speed_tol)
   end
 
@@ -120,7 +119,8 @@ class Ghost
       return
     end
     @stuck_ticks += 1
-    return unless @state == :frightened
+    # :in_house ghosts are intentionally stationary (cosmetic oscillation not
+    # yet implemented) and will log noise here; accept until that lands.
     return if @stuck_logged || @stuck_ticks < STUCK_LOG_THRESHOLD
 
     @stuck_logged = true
