@@ -1,7 +1,7 @@
 # Bugs & Tweaks
 
-- sometimes frightened ghosts don't move after hitting a wall needs to be investigated and fixed
-- during powerpellet mode, ghosts shouldn't come out of the ghost house after being eaten until the mode ends
+- tunnel slow down detection is triggering outside the real tunnel
+- player is moving too slow compared to the OG
 
 # First vertical slice MVP
 

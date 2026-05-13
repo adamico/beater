@@ -36,6 +36,16 @@ module GridMover
     return true  if direction == @direction
 
     if turn_possible?(direction, maze, projection)
+      # Snap the abandoned axis so non-integer speeds don't accumulate
+      # perpendicular drift across successive turns. Without this, drift can
+      # exceed at_cell_center? tolerance and strand the actor at walls.
+      if perpendicular_to_current?(direction)
+        snapped = snapped_position_for(direction, projection)
+        if snapped
+          @x = snapped[:x]
+          @y = snapped[:y]
+        end
+      end
       face direction
       return true
     end

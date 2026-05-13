@@ -9,6 +9,9 @@ require 'app/direction.rb'
 module GhostControllers
   DECISION_EPSILON = 0.0001
 
+  # Clyde flips to scatter when within this radius of Pac (OG arcade rule).
+  CLYDE_SHY_RADIUS_TILES = 8
+
   def self.at_decision_point?(ghost, projection)
     speed_tol = ghost.respond_to?(:speed) ? ghost.speed.to_f : 0.0
     ghost.at_cell_center?(projection, tolerance: speed_tol + DECISION_EPSILON)
@@ -156,7 +159,7 @@ module GhostControllers
     px, py = world.player.grid_cell(world.projection)
     gx, gy = ghost.grid_cell(world.projection)
     dist2 = (px - gx)**2 + (py - gy)**2
-    if dist2 >= 64 # >= 8 tiles
+    if dist2 >= CLYDE_SHY_RADIUS_TILES**2
       [px, py]
     else
       ghost.scatter_target

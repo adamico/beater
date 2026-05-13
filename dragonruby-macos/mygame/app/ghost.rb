@@ -48,7 +48,11 @@ class Ghost
     @sprite_offset_y = sprite_offset_y || (h * @sprite_scale - h) / 2.0
     @frightened_remaining_ticks = 0
     @elroy_state = :off
+    @stuck_ticks = 0
+    @stuck_logged = false
   end
+
+  STUCK_LOG_THRESHOLD = 120 # 2s @ 60fps
 
   def base_speed
     @base_speed
@@ -84,12 +88,42 @@ class Ghost
     try_turn(intent, maze, projection) unless intent.none?
     advance(maze, projection)
 
+    moved = (@x - old_x).abs > GhostControllers::DECISION_EPSILON ||
+            (@y - old_y).abs > GhostControllers::DECISION_EPSILON
+
     # If movement was rolled back by collision and we're near a cell center,
     # snap to the center so transition/turn logic can progress on next tick.
-    if (@x - old_x).abs <= GhostControllers::DECISION_EPSILON &&
-       (@y - old_y).abs <= GhostControllers::DECISION_EPSILON &&
-       at_cell_center?(projection, tolerance: speed_tol)
+    if !moved && at_cell_center?(projection, tolerance: speed_tol)
       snap_to_cell_center!(projection)
     end
+
+    detect_stuck(moved, maze, projection, speed_tol)
+  end
+
+  def detect_stuck(moved, maze, projection, speed_tol)
+    if moved
+      @stuck_ticks = 0
+      @stuck_logged = false
+      return
+    end
+    @stuck_ticks += 1
+    return unless @state == :frightened
+    return if @stuck_logged || @stuck_ticks < STUCK_LOG_THRESHOLD
+
+    @stuck_logged = true
+    gx, gy = grid_cell(projection)
+    cs = projection.cell_size.to_f
+    x_cells = (@x - projection.offset_x).to_f / cs
+    y_cells = (@y - projection.offset_y).to_f / cs
+    err = [(x_cells - x_cells.round).abs * cs, (y_cells - y_cells.round).abs * cs]
+    decision = at_cell_center?(projection, tolerance: speed_tol)
+    walk = Direction::ALL_MOVING.map { |d|
+      [d.name, maze.walkable?(gx + d.dx, gy + d.dy, role: @role)]
+    }.to_h
+    puts "[GHOST STUCK] tick=#{Kernel.tick_count} id=#{@identity} state=#{@state} " \
+         "stuck_ticks=#{@stuck_ticks} pos=(#{@x.round(2)},#{@y.round(2)}) " \
+         "cell=(#{gx},#{gy}) center_err=(#{err[0].round(3)},#{err[1].round(3)}) " \
+         "tol=#{speed_tol.round(3)} at_decision=#{decision} dir=#{@direction.name} " \
+         "speed=#{@speed} role=#{@role.inspect} walk=#{walk.inspect}"
   end
 end
