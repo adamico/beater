@@ -4,6 +4,8 @@ require 'app/grid_mover.rb'
 require 'app/tiles.rb'
 require 'app/ghost_controllers.rb'
 
+GHOST_DEBUG_LOGS = true
+
 class Ghost
   include GridMover
 
@@ -29,7 +31,7 @@ class Ghost
     if @state != new_state
       caller_line = caller(1, 1).first.to_s.split('/').last
       puts "[GHOST STATE] tick=#{Kernel.tick_count} id=#{@identity} #{@state.inspect} -> #{new_state.inspect} " \
-           "dir=#{@direction&.name} role=#{@role.inspect} from=#{caller_line}"
+           "dir=#{@direction&.name} role=#{@role.inspect} from=#{caller_line}" if GHOST_DEBUG_LOGS
     end
     @state = new_state
   end
@@ -137,6 +139,6 @@ class Ghost
          "stuck_ticks=#{@stuck_ticks} pos=(#{@x.round(2)},#{@y.round(2)}) " \
          "cell=(#{gx},#{gy}) center_err=(#{err[0].round(3)},#{err[1].round(3)}) " \
          "tol=#{speed_tol.round(3)} at_decision=#{decision} dir=#{@direction.name} " \
-         "speed=#{@speed} role=#{@role.inspect} walk=#{walk.inspect}"
+         "speed=#{@speed} role=#{@role.inspect} walk=#{walk.inspect}" if GHOST_DEBUG_LOGS
   end
 end

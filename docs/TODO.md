@@ -1,17 +1,16 @@
 # Bugs & Tweaks
 
+- ghosts are still getting stuck sometimes
+
 # First vertical slice MVP
 
 ## Visuals
-
-- collectible sprites (diamond)
-
+- maze cell dimensions needs to be tweaked to accomodate for the player sprite size which looks too small at 16:9 resolution
+  
 ## Audio
 
 ## Gameplay
-
-- tweak actors speed (frightened and eaten ghosts)
-- bonus score collectables
+- instead of having the player collide with enemies to kill them, make the player automatically shoot projectiles in the direction they are moving when they collect a power pellet.
   
 ## UI
 
@@ -45,6 +44,7 @@
 
 ## Gameplay
 
+- bonus score collectables
 - different maps
 - different tracks
 - mechanics:

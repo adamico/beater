@@ -6,6 +6,11 @@ require 'app/audio/beat_clock.rb'
 class Player
   include GridMover
 
+  PLAYER_SPRITE_PATH = "sprites/player.png"
+  PLAYER_SPRITE_WIDTH = 64
+  PLAYER_SPRITE_HEIGHT = 96
+  PLAYER_SPRITE_SCALE = 1.2
+
   attr_accessor :controller
   attr_reader :move_state, :commit_direction, :rhythm_fallback
 
@@ -13,8 +18,11 @@ class Player
     init_grid_mover(x: x, y: y, w: w, h: h, speed: speed, direction: direction)
     @controller = controller
     @base_speed = speed.to_f
-    @sprite_scale = 1.5
-    @sprite_offset = (w * @sprite_scale - w) / 2.0
+    @sprite_scale = PLAYER_SPRITE_SCALE
+    @sprite_render_w = w * @sprite_scale
+    @sprite_render_h = @sprite_render_w * (PLAYER_SPRITE_HEIGHT.to_f / PLAYER_SPRITE_WIDTH)
+    @sprite_offset_x = (@sprite_render_w - w) / 2.0
+    @sprite_offset_y = (@sprite_render_h - h) / 2.0
 
     @rhythm_enabled = false
     @rhythm_bpm = Audio::BeatClock::DEFAULT_BPM
@@ -32,7 +40,12 @@ class Player
     @dot_slow_remaining_ticks = 0
     @visual_offset_x = 0.0
     @visual_offset_y = 0.0
+    @walk_ticks = 0
   end
+
+  WALK_FRAME_START = 3
+  WALK_FRAME_COUNT = 8
+  TICKS_PER_WALK_FRAME = 4
 
   # Px per tick the rendered sprite catches up to the logical position
   # after a corner snap. Lower = more visible diagonal slide; higher = closer
@@ -152,11 +165,31 @@ class Player
   end
 
   def to_sprite
-    {
-      x: @x - @sprite_offset + @visual_offset_x, y: @y - @sprite_offset + @visual_offset_y,
-      w: @w * @sprite_scale, h: @h * @sprite_scale,
-      path: "sprites/circle/yellow.png"
+    frame = @walk_ticks.idiv(TICKS_PER_WALK_FRAME) % WALK_FRAME_COUNT
+    tile_index = WALK_FRAME_START + frame
+    base = {
+      x: @x - @sprite_offset_x + @visual_offset_x,
+      y: @y - @sprite_offset_y + @visual_offset_y,
+      w: @sprite_render_w, h: @sprite_render_h,
+      path: PLAYER_SPRITE_PATH,
+      tile_x: tile_index * PLAYER_SPRITE_WIDTH,
+      tile_y: 0,
+      tile_w: PLAYER_SPRITE_WIDTH,
+      tile_h: PLAYER_SPRITE_HEIGHT,
     }
+    case @direction
+      when Direction::LEFT then base.merge(flip_horizontally: true)
+      when Direction::UP   then base.merge(angle: 90)
+      when Direction::DOWN then base.merge(angle: 90, flip_horizontally: true)
+      else base
+    end
+  end
+
+  def advance(maze, projection)
+    pre_x, pre_y = @x, @y
+    super
+    moved = (@x - pre_x).abs > AXIS_SNAP_EPSILON || (@y - pre_y).abs > AXIS_SNAP_EPSILON
+    @walk_ticks += 1 if moved
   end
 
   private

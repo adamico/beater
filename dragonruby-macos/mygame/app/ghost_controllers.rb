@@ -92,7 +92,7 @@ module GhostControllers
 
       puts "[GHOST SCATTER] tick=#{Kernel.tick_count} id=#{ghost.identity} " \
            "cell=(#{gx},#{gy}) dir=#{ghost.direction.name} target=#{target_tile.inspect} " \
-           "cand=#{cand.inspect} chose=#{chosen.name} trail=#{trail.inspect}"
+           "cand=#{cand.inspect} chose=#{chosen.name} trail=#{trail.inspect}" if GHOST_DEBUG_LOGS
     end
 
     def self.log_phantom_reverse(ghost, world, gx, gy, walk_map)
@@ -117,7 +117,7 @@ module GhostControllers
            "pos=(#{ghost.x.round(2)}, #{ghost.y.round(2)}) " \
            "cell_floor=#{cell_floor.inspect} cell_round=#{cell_round.inspect} " \
            "decision_cell=(#{gx},#{gy}) center_err=(#{err[0].round(3)},#{err[1].round(3)}) tol=#{tol.round(3)} " \
-           "dir=#{ghost.direction.name} walkable=#{walk_map.inspect} -> reversed to #{ghost.direction.opposite.name}"
+           "dir=#{ghost.direction.name} walkable=#{walk_map.inspect} -> reversed to #{ghost.direction.opposite.name}" if GHOST_DEBUG_LOGS
     end
   end
 

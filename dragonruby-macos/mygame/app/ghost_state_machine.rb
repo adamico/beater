@@ -101,6 +101,6 @@ class GhostStateMachine
          "pos=(#{ghost.x.round(2)},#{ghost.y.round(2)}) " \
          "cell_floor=#{cur.inspect} cell_round=#{round_cell.inspect} target=#{target_cell.inspect} " \
          "centered=#{centered} err=(#{err[0].round(2)},#{err[1].round(2)}) tol=#{tol.round(2)} " \
-         "dir=#{ghost.direction.name} role=#{ghost.role.inspect}"
+         "dir=#{ghost.direction.name} role=#{ghost.role.inspect}" if GHOST_DEBUG_LOGS
   end
 end
