@@ -100,12 +100,13 @@
    { "name": "walk", "from": 3, "to": 10, "direction": "forward", "color": "#000000ff" }
   ],
   "layers": [
+   { "name": "BG", "opacity": 255, "blendMode": "normal" },
    { "name": "arm-bk", "opacity": 255, "blendMode": "normal" },
    { "name": "leg-bk", "opacity": 255, "blendMode": "normal" },
    { "name": "body", "opacity": 255, "blendMode": "normal" },
    { "name": "leg-fr", "opacity": 255, "blendMode": "normal" },
    { "name": "arm-fr", "opacity": 255, "blendMode": "normal" },
-   { "name": "head", "opacity": 255, "blendMode": "normal" }
+   { "name": "head2", "opacity": 255, "blendMode": "normal" }
   ],
   "slices": [
   ]
