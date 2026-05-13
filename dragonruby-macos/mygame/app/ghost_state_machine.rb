@@ -21,7 +21,7 @@ class GhostStateMachine
     ghost.state = :eaten
     ghost.role = Tiles::ROLE_GHOST_EATEN
     ghost.controller = GhostControllers::Eaten.new
-    ghost.speed = ghost.base_speed
+    ghost.speed = ghost.base_speed * Ghost::EATEN_SPEED_MULTIPLIER
     snap_to_cell(ghost)
   end
 

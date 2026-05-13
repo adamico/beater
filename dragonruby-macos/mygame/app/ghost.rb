@@ -19,7 +19,7 @@ class Ghost
     eaten: "sprites/hexagon/white.png"
   }.freeze
 
-  attr_accessor :controller, :elroy_state
+  attr_accessor :controller, :elroy_state, :eaten_flash_ticks
   attr_reader :state, :identity, :scatter_target, :spawn_cell
 
   def state=(new_state)
@@ -46,7 +46,17 @@ class Ghost
     @elroy_state = :off
     @stuck_ticks = 0
     @stuck_logged = false
+    @eaten_flash_ticks = 0
   end
+
+  # TG2 eaten-hit animation: identity sprite scales up to peak, then down to a
+  # tiny size; on completion sprite swaps to :eaten and ghost resumes movement
+  # (boosted) back to the house. Movement is frozen for the duration.
+  EATEN_FLASH_TICKS      = 24  # total animation length (~0.4s @ 60fps)
+  EATEN_GROW_TICKS       = 8   # ticks spent scaling up to peak
+  EATEN_FLASH_PEAK_SCALE = 1.6 # scale at peak (end of grow phase)
+  EATEN_FLASH_END_SCALE  = 0.1 # scale at end of shrink phase
+  EATEN_SPEED_MULTIPLIER = 2.2 # post-anim speed boost on return-to-house
 
   STUCK_LOG_THRESHOLD = 120 # 2s @ 60fps
 
@@ -56,16 +66,44 @@ class Ghost
 
   # Sprite is rendered at sprite_scale times the logical 1-cell rect (default
   # 2x = arcade 2x2 quad), centered via sprite_offset_x/y. Tweak via init args.
+  def flashing?
+    @eaten_flash_ticks && @eaten_flash_ticks > 0
+  end
+
   def to_sprite
-    path = @state == :eaten ? SPRITES[:eaten] : SPRITES[@identity]
+    if flashing?
+      age = EATEN_FLASH_TICKS - @eaten_flash_ticks # 0..EATEN_FLASH_TICKS-1
+      @eaten_flash_ticks -= 1                      # render-time tick (advances during sim hitstop)
+      if age < EATEN_GROW_TICKS
+        # Phase A: identity sprite, ease scale 1.0 -> PEAK (ease-out).
+        t = age.to_f / EATEN_GROW_TICKS
+        eased = 1.0 - (1.0 - t) * (1.0 - t)
+        scale = @sprite_scale * (1.0 + (EATEN_FLASH_PEAK_SCALE - 1.0) * eased)
+      else
+        # Phase B: identity sprite, ease scale PEAK -> END_SCALE (ease-in).
+        shrink_age = age - EATEN_GROW_TICKS
+        shrink_total = EATEN_FLASH_TICKS - EATEN_GROW_TICKS
+        t = (shrink_age.to_f / shrink_total).clamp(0.0, 1.0)
+        eased = t * t
+        scale = @sprite_scale * (EATEN_FLASH_PEAK_SCALE +
+                                 (EATEN_FLASH_END_SCALE - EATEN_FLASH_PEAK_SCALE) * eased)
+      end
+      path = SPRITES[@identity]
+    else
+      path = @state == :eaten ? SPRITES[:eaten] : SPRITES[@identity]
+      scale = @sprite_scale
+    end
+    off_x = (@w * scale - @w) / 2.0
+    off_y = (@h * scale - @h) / 2.0
     {
-      x: @x - @sprite_offset_x, y: @y - @sprite_offset_y,
-      w: @w * @sprite_scale, h: @h * @sprite_scale,
+      x: @x - off_x, y: @y - off_y,
+      w: @w * scale, h: @h * scale,
       path: path
     }
   end
 
   def update(intent:, maze:, projection:)
+    return if flashing? # frozen during eaten-hit animation; resumes when anim ends
     speed_tol = speed.to_f + GhostControllers::DECISION_EPSILON
 
     old_x = @x

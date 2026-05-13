@@ -181,9 +181,9 @@ class Game
       return
     end
 
+    @eat_sequencer.tick(args)
     if @eat_sequencer.frozen?
-      @eat_sequencer.tick_freeze(args)
-      visible_ghosts = @ghosts.reject { |g| g.state == :eaten }
+      visible_ghosts = @ghosts.reject { |g| g.state == :eaten && !g.flashing? }
       @renderer.draw(outputs, @maze, @pellets, nil, visible_ghosts, popup: @eat_sequencer.popup, level_complete: false)
       draw_audio_debug_watch if args.state.debug_audio
       return

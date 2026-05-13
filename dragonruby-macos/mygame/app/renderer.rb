@@ -79,7 +79,8 @@ class Renderer
       size_enum: 4,
       alignment_enum: 1,
       vertical_alignment_enum: 1,
-      **POPUP_COLOR
+      **POPUP_COLOR,
+      a: popup[:alpha] || 255
     }
   end
 
