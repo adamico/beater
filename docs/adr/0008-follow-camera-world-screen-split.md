@@ -12,6 +12,10 @@ The camera is **asymmetric by axis**, a direct consequence of the maze topology 
 
 **Directional look-ahead** (TG3, resolved in playtest): the camera leads the player along the travel axis by an eased 2D offset — target = `direction * lead-cells * CELL_SIZE`, eased per-frame (`offset += (target - offset) * ease`), decaying to zero when the player is stopped. The lead is configured per-axis in **cells** (`LOOK_AHEAD_CELLS_X/Y`) rather than as a viewport fraction: a 16:9 viewport already shows less vertically, so leading the same cell count both ways deliberately spends more of the budget on the scarce vertical dimension. The Y-clamp is applied *after* the offset, so look-ahead near the maze top/bottom is simply clamped away. The minimap idea floated in TG3 was dropped — the level is small and ghosts are usually already on-screen.
 
+## Amendment — eased camera during `Dying` (2026-05-14)
+
+Hard-lock holds for `playing`. One exception: the `Dying` `Game state`. On player death the actors teleport back to their spawn cells, which under hard-lock teleported the camera too — playtest judged the snap "not a very good effect." During `Dying` phase 2 the camera therefore **leaves hard-lock** and eases from its current position to the reset player: ease-in-out, duration proportional to distance (clamped to a min/max frame range), taking the **short toroidal path** on X to stay consistent with the modulo-world-width draw. It snaps back to hard-lock the frame `dying → playing` fires. This stays render-only — it never feeds back into physics, so the ADR's core split is intact; only the *follow style* is state-dependent. See `CONTEXT.md` **Dying** / **Camera**.
+
 ## Considered Options
 
 - **Bump `CELL_SIZE` on a static camera** — capped at ~21px by the 34-row maze height; barely helps, doesn't fix the tall-sprite constraint. Rejected.

@@ -49,6 +49,12 @@ class Game
 
   STEP_INPUT_GRACE_TICKS = 3
 
+  STARTING_LIVES = 3
+  # Ready-state count-in length: one bar.
+  READY_TICKS = (FRAMES_PER_BEAT * CELLS_PER_BEAT).round
+  # Grace before game-over accepts a restart key (lets the stinger breathe).
+  GAME_OVER_INPUT_GRACE_TICKS = 45
+
   SPAWN_MARKER_TO_IDENTITY = {
     Tiles::SPAWN_BLINKY => :blinky,
     Tiles::SPAWN_PINKY  => :pinky,
@@ -83,11 +89,12 @@ class Game
     @eat_sequencer = EatSequencer.new(state_machine: @ghost_fsm)
 
     @score = 0
-    @level_complete = false
+    @lives = STARTING_LIVES
     @audio_state_for = nil
     @projectiles = []
     initialize_player
     initialize_ghosts
+    enter_ready
   end
 
   def scan_player_spawn
@@ -190,21 +197,42 @@ class Game
     args.state.audio.tick(args)
     toggle_audio_debug_watch
 
-    if @level_complete
-      args.state.audio.on_level_complete_duck_clear(args)
-      request_reset_if_any_key
-      update_camera
-      @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, camera: @camera, popup: @eat_sequencer.popup, level_complete: true)
-      draw_audio_debug_watch if args.state.debug_audio
-      return
+    case @state
+    when :ready          then tick_ready
+    when :playing        then tick_playing
+    when :dying          then tick_dying
+    when :level_complete then tick_level_complete
+    when :game_over      then tick_game_over
     end
+  end
 
+  # --- Game state machine (see CONTEXT.md "Game state") --------------------
+
+  def enter_ready
+    @state = :ready
+    @ready_elapsed = 0
+    @ready_last_beat = -1
+  end
+
+  def tick_ready
+    beat = (@ready_elapsed / FRAMES_PER_BEAT).floor
+    if beat != @ready_last_beat
+      @ready_last_beat = beat
+      args.state.audio.on_count_in_beat(args)
+    end
+    @ready_elapsed += 1
+    @state = :playing if @ready_elapsed >= READY_TICKS
+
+    update_camera
+    draw_frame
+  end
+
+  def tick_playing
     @eat_sequencer.tick(args)
     if @eat_sequencer.frozen?
       visible_ghosts = @ghosts.reject { |g| g.state == :eaten && !g.flashing? }
       update_camera
-      @renderer.draw(outputs, @maze, @pellets, @player, visible_ghosts, camera: @camera, popup: @eat_sequencer.popup, level_complete: false)
-      draw_audio_debug_watch if args.state.debug_audio
+      draw_frame(ghosts: visible_ghosts)
       return
     end
 
@@ -223,16 +251,138 @@ class Game
     tick_player(world)
     update_camera
     if check_level_complete
-      @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, camera: @camera, popup: @eat_sequencer.popup, level_complete: true)
-      draw_audio_debug_watch if args.state.debug_audio
+      draw_frame
       return
     end
     tick_ghosts(world)
     tick_fire_input(world)
     tick_projectiles
     tick_collisions
-    @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, camera: @camera, projectiles: @projectiles, popup: @eat_sequencer.popup, level_complete: false)
+    draw_frame
+  end
+
+  # Phase 1: fixed-frame death animation, world frozen, music ducked out.
+  # Phase 2: actors reset, then the camera eases back to the player while
+  # music eases in. Routes to game_over when no lives remain.
+  def tick_dying
+    if @dying_phase == :anim
+      @player.tick_death
+      if @player.death_anim_done?
+        respawn_actors
+        if @lives <= 0
+          enter_game_over
+          return
+        end
+        start_camera_return
+        @dying_phase = :camera
+      end
+      draw_frame
+    else # :camera
+      arrived = @camera.tick_dying_ease
+      draw_frame
+      @state = :playing if arrived
+    end
+  end
+
+  def tick_level_complete
+    args.state.audio.on_level_complete_duck_clear(args)
+    if any_key_pressed?
+      start_next_level
+      return
+    end
+    update_camera
+    draw_frame
+  end
+
+  def tick_game_over
+    @game_over_ticks += 1
+    request_reset_if_any_key if @game_over_ticks > GAME_OVER_INPUT_GRACE_TICKS
+    update_camera
+    draw_frame
+  end
+
+  def enter_dying
+    @lives -= 1
+    @state = :dying
+    @dying_phase = :anim
+    @player.begin_death
+    @projectiles.clear
+    args.state.audio.on_player_death(args)
+  end
+
+  def enter_game_over
+    @state = :game_over
+    @game_over_ticks = 0
+    args.state.audio.on_game_over(args)
+  end
+
+  # In-place reset for the level loop: keep score and lives, rebuild pellets
+  # and actors, return to the ready count-in.
+  def start_next_level
+    @pellets = Pellets.from_maze(@maze)
+    @projectiles.clear
+    reset_player_to_spawn
+    @player.reset_ammo!
+    initialize_ghosts
+    @phase_scheduler.reset
+    @eat_sequencer.reset
+    @audio_state_for = nil # forces set_dot_totals refresh for the new pellets
+    enter_ready
+  end
+
+  def reset_player_to_spawn
+    spawn = @projection.cell_rect(*@player_spawn)
+    @player.x = spawn[:x]
+    @player.y = spawn[:y]
+    @player.face(Direction::RIGHT)
+    @player.clear_death
+  end
+
+  # Teleport player + ghosts to spawn, reset schedulers. The dying-phase
+  # boundary — runs once the death animation completes.
+  def respawn_actors
+    reset_player_to_spawn
+    @ghosts.each do |g|
+      cell = @spawn_cells[g.identity]
+      rect = @projection.cell_rect(*cell)
+      g.x = rect[:x]
+      g.y = rect[:y]
+    end
+    @phase_scheduler.reset
+    @eat_sequencer.reset
+    reset_ghost_states
+  end
+
+  def start_camera_return
+    cx = @player.x + @player.w / 2.0
+    cy = @player.y + @player.h / 2.0
+    @camera.begin_dying_ease(cx, cy)
+    args.state.audio.on_respawn(args, ramp_out: @camera.dying_ease_duration)
+  end
+
+  def draw_frame(ghosts: @ghosts)
+    @renderer.draw(
+      outputs, @maze, @pellets, @player, ghosts,
+      camera: @camera,
+      projectiles: @projectiles,
+      popup: @eat_sequencer.popup,
+      hud: hud_data,
+      state: @state
+    )
     draw_audio_debug_watch if args.state.debug_audio
+  end
+
+  def hud_data
+    {
+      score: @score,
+      lives: @lives,
+      completion: @pellets.completion_by_color
+    }
+  end
+
+  def any_key_pressed?
+    !args.inputs.keyboard.key_down.truthy_keys.empty? ||
+      !args.inputs.controller_one.key_down.truthy_keys.empty?
   end
 
   def tick_phase
@@ -359,31 +509,13 @@ class Game
     @ghosts.each do |g|
       next if g.state == :in_house || g.state == :eaten
       next unless rects_overlap?(@player.rect, g.rect)
-      player_dies
+      enter_dying
       return
     end
   end
 
   def eat_ghost(ghost)
     @score += @eat_sequencer.on_ghost_eaten(args, ghost)
-  end
-
-  def player_dies
-    spawn = @projection.cell_rect(*@player_spawn)
-    @player.x = spawn[:x]
-    @player.y = spawn[:y]
-    @player.face(Direction::RIGHT)
-
-    @ghosts.each do |g|
-      cell = @spawn_cells[g.identity]
-      rect = @projection.cell_rect(*cell)
-      g.x = rect[:x]
-      g.y = rect[:y]
-    end
-    @phase_scheduler.reset
-    @eat_sequencer.reset
-    @projectiles.clear
-    reset_ghost_states
   end
 
   def ensure_audio_state
@@ -408,9 +540,9 @@ class Game
   end
 
   def check_level_complete
-    return false if @level_complete || @pellets.remaining != 0
+    return false if @state == :level_complete || @pellets.remaining != 0
 
-    @level_complete = true
+    @state = :level_complete
     @projectiles.clear
     @player.reset_ammo!
     args.state.audio.on_level_complete_duck_clear(args)
@@ -419,11 +551,7 @@ class Game
   end
 
   def request_reset_if_any_key
-    kb_keys = args.inputs.keyboard.key_down.truthy_keys
-    c1_keys = args.inputs.controller_one.key_down.truthy_keys
-    return if kb_keys.empty? && c1_keys.empty?
-
-    args.state.request_game_reset = true
+    args.state.request_game_reset = true if any_key_pressed?
   end
 
   def toggle_audio_debug_watch

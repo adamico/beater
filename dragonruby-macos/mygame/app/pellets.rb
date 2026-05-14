@@ -32,6 +32,23 @@ class Pellets
 
   def initialize(state)
     @state = state
+    @totals_by_color = Hash.new(0)
+    @remaining_by_color = Hash.new(0)
+    state.each_value do |entry|
+      next unless entry[:kind] == :pellet && entry[:color]
+      @totals_by_color[entry[:color]] += 1
+      @remaining_by_color[entry[:color]] += 1
+    end
+  end
+
+  attr_reader :totals_by_color, :remaining_by_color
+
+  # Per-color progress ratio (dots eaten / total) — drives the HUD track meters.
+  def completion_by_color
+    COLORS.to_h do |c|
+      total = @totals_by_color[c]
+      [c, total > 0 ? (total - @remaining_by_color[c]).to_f / total : 0.0]
+    end
   end
 
   def at(gx, gy)
@@ -49,7 +66,11 @@ class Pellets
   end
 
   def eat(gx, gy)
-    @state.delete([gx, gy])
+    entry = @state.delete([gx, gy])
+    if entry && entry[:kind] == :pellet && entry[:color]
+      @remaining_by_color[entry[:color]] -= 1
+    end
+    entry
   end
 
   def remaining

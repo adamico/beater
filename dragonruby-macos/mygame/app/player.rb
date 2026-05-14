@@ -59,6 +59,31 @@ class Player
     @ammo = 0
   end
 
+  # Fixed-frame death animation (Dying state, phase 1). Not beat-synced — kept
+  # snappy for the frantic feel. The sprite spins, shrinks and fades over the
+  # window; the logical position is untouched (the world is frozen anyway).
+  DEATH_ANIM_TICKS = 36
+
+  def begin_death
+    @death_ticks = DEATH_ANIM_TICKS
+  end
+
+  def tick_death
+    @death_ticks -= 1 if @death_ticks && @death_ticks > 0
+  end
+
+  def dying?
+    !@death_ticks.nil?
+  end
+
+  def death_anim_done?
+    !@death_ticks.nil? && @death_ticks <= 0
+  end
+
+  def clear_death
+    @death_ticks = nil
+  end
+
   WALK_FRAME_START = 3
   WALK_FRAME_COUNT = 8
   TICKS_PER_WALK_FRAME = 4
@@ -183,6 +208,8 @@ class Player
   end
 
   def to_sprite
+    return death_sprite if dying?
+
     frame = @walk_ticks.idiv(TICKS_PER_WALK_FRAME) % WALK_FRAME_COUNT
     tile_index = WALK_FRAME_START + frame
     base = {
@@ -201,6 +228,24 @@ class Player
       when Direction::DOWN then base.merge(angle: 90, flip_horizontally: true)
       else base
     end
+  end
+
+  # Spin + shrink + fade about the sprite centre, driven by death-anim progress.
+  def death_sprite
+    t = (1.0 - @death_ticks.to_f / DEATH_ANIM_TICKS).clamp(0.0, 1.0)
+    scale = 1.0 - t
+    w = PLAYER_SPRITE_WIDTH * scale
+    h = PLAYER_SPRITE_HEIGHT * scale
+    cx = @x + @sprite_offset_x + PLAYER_SPRITE_WIDTH / 2.0
+    cy = @y + @sprite_offset_y + PLAYER_SPRITE_HEIGHT / 2.0
+    {
+      x: cx - w / 2.0, y: cy - h / 2.0, w: w, h: h,
+      path: PLAYER_SPRITE_PATH,
+      tile_x: WALK_FRAME_START * PLAYER_SPRITE_WIDTH, tile_y: 0,
+      tile_w: PLAYER_SPRITE_WIDTH, tile_h: PLAYER_SPRITE_HEIGHT,
+      angle: t * 540.0,
+      a: (255 * (1.0 - t)).to_i
+    }
   end
 
   def advance(maze, projection)

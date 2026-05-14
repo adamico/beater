@@ -109,6 +109,20 @@ class AudioSpy
     @level_complete_calls += 1
   end
 
+  def on_player_death(args)
+    set_duck(args, active: true, gain_scale: 0.12, ramp_in: 18, ramp_out: 8)
+  end
+
+  def on_respawn(args, ramp_out: 30)
+    set_duck(args, active: false, gain_scale: 0.12, ramp_in: 18, ramp_out: ramp_out)
+  end
+
+  def on_count_in_beat(_args)
+  end
+
+  def on_game_over(_args)
+  end
+
   def set_duck(_args, active:, gain_scale:, ramp_in:, ramp_out:, immediate: false)
     @duck_calls << {
       active: active,
@@ -221,6 +235,7 @@ end
 def test_tick_no_duck_during_normal_play args, assert
   game, _args, audio = build_game_with_spy_audio
 
+  game.instance_variable_set(:@state, :playing)
   game.instance_variable_get(:@eat_sequencer).eat_pause_ticks = 0
 
   game.define_singleton_method(:tick_phase) {}

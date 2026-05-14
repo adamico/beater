@@ -75,6 +75,31 @@ module Audio
       SFXPlayer.play(args, :enemy_eaten)
     end
 
+    # Music ducks out on player death (Dying phase 1). Eased via ramp_in.
+    DEATH_DUCK_GAIN_SCALE = 0.12
+    DEATH_DUCK_RAMP_IN    = 18
+
+    def on_player_death(args)
+      set_duck(args, active: true,
+                     gain_scale: DEATH_DUCK_GAIN_SCALE,
+                     ramp_in: DEATH_DUCK_RAMP_IN,
+                     ramp_out: 8)
+    end
+
+    # Music eases back in to the current mix while the camera returns
+    # (Dying phase 2). `ramp_out` matches the camera ease duration.
+    def on_respawn(args, ramp_out: 30)
+      set_duck(args, active: false,
+                     gain_scale: DEATH_DUCK_GAIN_SCALE,
+                     ramp_in: DEATH_DUCK_RAMP_IN,
+                     ramp_out: ramp_out)
+    end
+
+    # One metronome click per beat of the Ready-state count-in.
+    def on_count_in_beat(args)
+      SFXPlayer.play(args, :dot_tick)
+    end
+
     def on_game_over(args)
       TRACKS.each { |n| args.audio[@players[n].track_key]&.tap { |a| a.paused = true } }
       SFXPlayer.play(args, :game_over)

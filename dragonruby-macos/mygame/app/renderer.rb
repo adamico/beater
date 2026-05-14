@@ -36,20 +36,103 @@ class Renderer
   HUD_AMMO_MARGIN_X = 20
   HUD_AMMO_MARGIN_Y = 20
 
+  HUD_TEXT_COLOR   = { r: 255, g: 255, b: 255 }.freeze
+  HUD_DIM_COLOR    = { r: 200, g: 200, b: 200 }.freeze
+  # Lives: row of small player-sprite icons, top-right.
+  HUD_LIFE_ICON_W  = 22
+  HUD_LIFE_ICON_H  = 33
+  HUD_LIFE_GAP     = 6
+  HUD_LIFE_Y       = 686
+  # Track completion: 4 colored meters across the top centre.
+  HUD_METER_W      = 110
+  HUD_METER_H      = 12
+  HUD_METER_GAP    = 12
+  HUD_METER_Y      = 698
+  HUD_METER_BG     = { r: 55, g: 55, b: 55 }.freeze
+  HUD_METER_COLORS = [:red, :green, :blue, :yellow].freeze
+
   def initialize(projection)
     @projection = projection
     @world_target_built = false
   end
 
-  def draw(outputs, maze, pellets, player, ghosts = [], camera:, projectiles: [], popup: nil, level_complete: false)
+  def draw(outputs, maze, pellets, player, ghosts = [], camera:, projectiles: [], popup: nil, hud: nil, state: :playing)
     @camera = camera
     outputs.background_color = BACKGROUND
     draw_world(outputs, maze)
     draw_pellets(outputs, pellets)
     draw_actors(outputs, player, ghosts, projectiles)
-    draw_hud_ammo(outputs, player) if player
+    draw_hud(outputs, player, hud) if hud && state != :game_over
     draw_popup(outputs, popup) if popup
-    level_complete
+    draw_state_banner(outputs, state)
+    state
+  end
+
+  # Screen-space HUD: ammo row, score, life icons, 4 track-completion meters.
+  def draw_hud(outputs, player, hud)
+    draw_hud_ammo(outputs, player) if player
+    outputs.labels << {
+      x: HUD_AMMO_MARGIN_X, y: 706,
+      text: "SCORE #{hud[:score]}", size_enum: 4, **HUD_TEXT_COLOR
+    }
+    draw_hud_lives(outputs, hud[:lives])
+    draw_hud_meters(outputs, hud[:completion])
+  end
+
+  def draw_hud_lives(outputs, lives)
+    return unless lives
+    sprites = []
+    lives.times do |i|
+      sprites << {
+        x: Camera::SCREEN_W - HUD_AMMO_MARGIN_X - (i + 1) * (HUD_LIFE_ICON_W + HUD_LIFE_GAP),
+        y: HUD_LIFE_Y, w: HUD_LIFE_ICON_W, h: HUD_LIFE_ICON_H,
+        path: Player::PLAYER_SPRITE_PATH,
+        tile_x: Player::WALK_FRAME_START * Player::PLAYER_SPRITE_WIDTH, tile_y: 0,
+        tile_w: Player::PLAYER_SPRITE_WIDTH, tile_h: Player::PLAYER_SPRITE_HEIGHT
+      }
+    end
+    outputs.sprites << sprites
+  end
+
+  def draw_hud_meters(outputs, completion)
+    return unless completion
+    total_w = HUD_METER_COLORS.size * HUD_METER_W +
+              (HUD_METER_COLORS.size - 1) * HUD_METER_GAP
+    start_x = (Camera::SCREEN_W - total_w) / 2
+    solids = []
+    HUD_METER_COLORS.each_with_index do |color, i|
+      x = start_x + i * (HUD_METER_W + HUD_METER_GAP)
+      ratio = (completion[color] || 0.0).clamp(0.0, 1.0)
+      solids << { x: x, y: HUD_METER_Y, w: HUD_METER_W, h: HUD_METER_H, **HUD_METER_BG }
+      solids << {
+        x: x, y: HUD_METER_Y, w: (HUD_METER_W * ratio).round, h: HUD_METER_H,
+        **(PELLET_COLOR_BY_KEY[color] || PELLET_COLOR_FALLBACK)
+      }
+    end
+    outputs.solids << solids
+  end
+
+  # Centred banner for the non-playing states.
+  def draw_state_banner(outputs, state)
+    text = case state
+           when :ready          then "READY?"
+           when :level_complete then "LEVEL COMPLETE"
+           when :game_over      then "GAME OVER"
+           end
+    return unless text
+
+    cx = Camera::SCREEN_W / 2
+    cy = Camera::SCREEN_H / 2
+    outputs.labels << {
+      x: cx, y: cy + 24, text: text, size_enum: 12,
+      alignment_enum: 1, vertical_alignment_enum: 1, **HUD_TEXT_COLOR
+    }
+    return if state == :ready
+
+    outputs.labels << {
+      x: cx, y: cy - 28, text: "press any key", size_enum: 2,
+      alignment_enum: 1, vertical_alignment_enum: 1, **HUD_DIM_COLOR
+    }
   end
 
   # World point -> the 1-2 screen-space copies of a world-space primitive

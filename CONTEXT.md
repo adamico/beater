@@ -4,6 +4,22 @@ Maze chase game with a rhythm hook. Diverges from OG Pac-Man where called out. A
 
 ## Terms
 
+- **Game state** — top-level state of a single run, owned by `Game`. One of `ready` (level intro, only at level start — not on respawn), `playing`, `dying`, `level_complete`, `game_over`. Transitions: `ready → playing`, `playing → dying`, `dying → playing` (respawn) or `dying → game_over` (no lives left), `playing → level_complete → ready` (next level). Replaces the former `@level_complete` boolean.
+
+- **Life** — integer count of player retries in a run. Starts at 3 on new game. Carries across levels and across death; reset to 3 only on new-game-from-title. Decremented by 1 on entering `dying`. Reaching 0 routes `dying → game_over` instead of respawn. Losing a life does not reset `Ammo` (ammo carry-across is unchanged — see [ADR-0007](docs/adr/0007-finite-ammo-manual-fire.md)). No extra-life-from-score mechanic in the first slice (deferred).
+
+- **Track** — one of the 4 music stems (`drums`, `bass`, `lead`, `chords`), each bound to a dot color via `Audio::Manager::DOT_COLORS` (red→drums, green→bass, blue→lead, yellow→chords). Eating a dot of a color advances its track.
+
+- **Track completion** — per-`Track` progress ratio: dots eaten of that color ÷ total dots of that color in the level. Dot-based only (not time/score). Drives the audio progression mix and the HUD's 4 track meters. Backed by a live remaining-by-color counter on `Pellets` (decremented on eat), not a rescan.
+
+- **HUD** — screen-space overlay. Shows score (run-long total), `Life` count as a row of player-sprite icons, the `HUD ammo row`, and 4 `Track completion` meters. Visible in `ready` / `playing` / `dying`; replaced by the centered "GAME OVER" label in `game_over`.
+
+- **Ready** — level-intro `Game state`, entered at level start only (not on respawn). Actors placed and frozen; a beat-synced count-in (≈1 bar at `LEVEL_BPM`) plays metronome clicks, no track. Automatic `ready → playing` at count-in end, no input gate.
+
+- **Dying** — `Game state` entered on `Body-contact`. World frozen (reuse the `EatSequencer.frozen?` pattern). Two phases: (1) fixed-frame death animation (~30–40 frames, not beat-synced) with music ducked out on an ease-out; (2) actors teleport to spawn cells, projectiles cleared, phase scheduler reset, then the `Camera` eases from its current position to the reset player while music eases back in to the current track-completion mix levels. Exits automatically: `dying → playing` when the ease completes if `Life > 0` (decremented on entry), else `dying → game_over`.
+
+- **Game over** — terminal `Game state` reached from `dying` when `Life` hits 0. Shows a bare centered "GAME OVER" / "press any key" label (UI5 proper screen deferred). Press-any-key triggers a full `Game` rebuild via `request_game_reset` — the only remaining full-rebuild path. Title-screen routing wired in when UI1 lands.
+
 - **Ammo** — integer count of bullets the player currently holds. Starts at 0 on each new level, increases by `AMMO_PER_POWER_PELLET` (= 5) per power-pellet pickup, no cap. Decremented by 1 per fired bullet. Carries across player death; resets to 0 on level complete. See [ADR-0007](docs/adr/0007-finite-ammo-manual-fire.md).
 
 - **Fire input** — edge-triggered key press (Space / controller south) that spends one ammo and spawns a projectile in the player's current travel direction. No-op when ammo is 0 or `player.direction == NONE`. No rate limit beyond edge-trigger.
@@ -28,4 +44,4 @@ Maze chase game with a rhythm hook. Diverges from OG Pac-Man where called out. A
 
 - **Screen space** — final pixel space of the 1280×720 output. HUD and popups live here directly. Actors / maze / pellets live in world space and are mapped to screen space by the **Camera**.
 
-- **Camera** — pure view transform (world → screen): a `zoom` factor plus translation. Render-only; never feeds back into physics. Follows the player (hard-lock) so the zoomed-in maze scrolls: Y clamps to maze bounds, X follows freely and draws the world modulo world-width. Fixed `zoom = 1.0`. See [ADR-0008](docs/adr/0008-follow-camera-world-screen-split.md).
+- **Camera** — pure view transform (world → screen): a `zoom` factor plus translation. Render-only; never feeds back into physics. Follows the player (hard-lock) so the zoomed-in maze scrolls: Y clamps to maze bounds, X follows freely and draws the world modulo world-width. Fixed `zoom = 1.0`. During `Dying` phase 2 the camera leaves hard-lock and eases (ease-in-out, duration proportional to distance clamped to a min/max frame range, short toroidal path on X) from its current position to the reset player, then snaps back to hard-lock the frame `dying → playing` fires. See [ADR-0008](docs/adr/0008-follow-camera-world-screen-split.md).

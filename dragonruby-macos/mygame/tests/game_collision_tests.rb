@@ -20,22 +20,21 @@ def first_active_ghost_for_collision(game)
   game.instance_variable_get(:@ghosts).find { |g| g.state != :in_house && g.state != :eaten }
 end
 
-def test_body_contact_with_active_ghost_kills_player args, assert
+def test_body_contact_with_active_ghost_enters_dying args, assert
   game, _args = collision_setup
   ghost = first_active_ghost_for_collision(game)
-  pre_player_x = game.instance_variable_get(:@player).x
+  lives_before = game.instance_variable_get(:@lives)
 
-  # Move player to ghost position; spawn-recovery in player_dies will reset
-  # both, so we observe the death by detecting that the player snapped back
-  # to spawn while the ghost also moved.
+  # Body-contact no longer teleports instantly: it enters the Dying state,
+  # decrements a life, and begins the death animation. The actual respawn
+  # happens later when the animation completes.
   place_player_on_ghost(game, ghost)
   game.tick_collisions
 
   player = game.instance_variable_get(:@player)
-  spawn_cell = game.instance_variable_get(:@player_spawn)
-  spawn = game.instance_variable_get(:@projection).cell_rect(*spawn_cell)
-  assert.equal! player.x, spawn[:x]
-  assert.equal! player.y, spawn[:y]
+  assert.equal! game.instance_variable_get(:@state), :dying
+  assert.equal! game.instance_variable_get(:@lives), lives_before - 1
+  assert.true! player.dying?
 end
 
 def test_body_contact_with_eaten_ghost_does_not_kill args, assert
