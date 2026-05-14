@@ -83,8 +83,8 @@ def test_look_ahead_converges_to_lead_cells args, assert
   cam = fresh_camera
   settle(cam, 1440, 1632, Direction::RIGHT)
   sx, _ = cam.to_screen(1440, 1632)
-  # Lead converges to LOOK_AHEAD_CELLS_X (3) * cell_size (48) = 144px.
-  assert.equal! sx.round, (640 - 144)
+  # Lead converges to LOOK_AHEAD_CELLS_X (2) * cell_size (48) = 96px.
+  assert.equal! sx.round, (640 - 96)
 end
 
 def test_look_ahead_decays_to_zero_when_stopped args, assert

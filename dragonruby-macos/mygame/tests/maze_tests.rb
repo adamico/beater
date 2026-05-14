@@ -68,8 +68,9 @@ end
 # tiles per side.
 def test_pacman_tunnel_precision args, assert
   maze = Maze.from_layout(MapLayouts::PACMAN_LAYOUT)
-  # Layout row index 18 (top-down) -> after y-flip: gy = 34 - 1 - 18 = 15.
-  gy = 15
+  # Tunnel row is layout index 15 (top-down) of a 33-row layout ->
+  # after y-flip: gy = 33 - 1 - 15 = 17.
+  gy = 17
   # Cols 0..6 marked `t` -> tunnel.
   (0..6).each { |gx| assert.true! maze.tunnel?(gx, gy) }
   # Col 7 is `.` (pellet) — previously misclassified, must be non-tunnel now.
