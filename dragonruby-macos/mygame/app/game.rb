@@ -12,6 +12,7 @@ require 'app/ghost_controllers.rb'
 require 'app/world.rb'
 require 'app/renderer.rb'
 require 'app/audio/beat_clock.rb'
+require 'app/level_config.rb'
 require 'app/phase_scheduler.rb'
 require 'app/release_schedule.rb'
 require 'app/ghost_state_machine.rb'
@@ -35,15 +36,8 @@ class Game
   FRAMES_PER_CELL = FRAMES_PER_BEAT / CELLS_PER_BEAT
   PLAYER_SPEED = CELL_SIZE / FRAMES_PER_CELL
 
-  GHOST_SPEED_RATIO      = 0.75 # OG Lvl 1
-  GHOST_TUNNEL_RATIO     = 0.4  # OG Lvl 1 (in tunnel row)
-  GHOST_ELROY1_RATIO     = 0.85
-  GHOST_ELROY2_RATIO     = 0.95
-
-  GHOST_SPEED            = PLAYER_SPEED * GHOST_SPEED_RATIO
-  GHOST_TUNNEL_SPEED     = PLAYER_SPEED * GHOST_TUNNEL_RATIO
-  GHOST_ELROY1_SPEED     = PLAYER_SPEED * GHOST_ELROY1_RATIO
-  GHOST_ELROY2_SPEED     = PLAYER_SPEED * GHOST_ELROY2_RATIO
+  # Ghost speeds, tunnel slowdown and Cruise Elroy thresholds are per-Level
+  # data — see LevelConfig and CONTEXT.md "Level".
 
   PROJECTILE_SPEED       = PLAYER_SPEED * 2.0
 
@@ -96,10 +90,12 @@ class Game
 
     @score = 0
     @lives = STARTING_LIVES
+    @level = 1
     @audio_state_for = nil
     @projectiles = []
     @track_popups = []      # G1: Game-owned score popups for track completion
     @meter_flash = {}       # G1: color => ticks remaining for HUD meter flash
+    apply_level_config
     initialize_player
     initialize_ghosts
     enter_ready
@@ -163,7 +159,7 @@ class Game
         identity: id,
         x: rect[:x], y: rect[:y],
         w: CELL_SIZE, h: CELL_SIZE,
-        speed: GHOST_SPEED,
+        speed: PLAYER_SPEED * @level_config[:ghost_speed_ratio],
         scatter_target: scatter_targets[id],
         spawn_cell: cell,
         controller: GhostControllers.for(id),
@@ -325,9 +321,20 @@ class Game
     args.state.audio.on_game_over(args)
   end
 
+  # Single seam for per-Level difficulty data (see CONTEXT.md "Level").
+  # Called from initialize (level 1) and start_next_level. Seeds the phase
+  # scheduler; ghost speeds and Elroy thresholds are read live from
+  # @level_config by initialize_ghosts / apply_dynamic_speeds.
+  def apply_level_config
+    @level_config = LevelConfig.for(@level)
+    @phase_scheduler.load_table(@level_config[:phase_table])
+  end
+
   # In-place reset for the level loop: keep score and lives, rebuild pellets
   # and actors, return to the ready count-in.
   def start_next_level
+    @level += 1
+    apply_level_config
     @pellets = Pellets.from_maze(@maze)
     @projectiles.clear
     reset_player_to_spawn
@@ -338,6 +345,7 @@ class Game
     @track_popups.clear
     @meter_flash.clear
     @audio_state_for = nil # forces set_dot_totals refresh for the new pellets
+    args.state.audio.on_level_start(args) # re-close track filters to initial values
     enter_ready
   end
 
@@ -523,7 +531,12 @@ class Game
   def apply_dynamic_speeds
     clyde = @ghosts.find { |g| g.identity == :clyde }
     clyde_in_house = clyde && clyde.state == :in_house
-    elroy = CruiseElroy.state(@pellets.remaining, clyde_in_house: clyde_in_house)
+    elroy = CruiseElroy.state(
+      @pellets.remaining,
+      clyde_in_house: clyde_in_house,
+      elroy1_dots: @level_config[:elroy1_dots],
+      elroy2_dots: @level_config[:elroy2_dots]
+    )
     @ghosts.each do |g|
       next if g.state == :in_house || g.state == :leaving_house
 
@@ -536,11 +549,11 @@ class Game
 
   def effective_ghost_speed(g)
     gx, gy = g.grid_cell(@projection)
-    return GHOST_TUNNEL_SPEED if @maze.tunnel?(gx, gy)
+    return PLAYER_SPEED * @level_config[:ghost_tunnel_ratio] if @maze.tunnel?(gx, gy)
     if g.identity == :blinky
       case g.elroy_state
-      when :elroy2 then return GHOST_ELROY2_SPEED
-      when :elroy1 then return GHOST_ELROY1_SPEED
+      when :elroy2 then return PLAYER_SPEED * @level_config[:elroy2_ratio]
+      when :elroy1 then return PLAYER_SPEED * @level_config[:elroy1_ratio]
       end
     end
     g.base_speed

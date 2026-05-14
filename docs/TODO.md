@@ -8,7 +8,6 @@
 
 ## Gameplay
 
-- G4: add more levels inspired by the OG.
 - G5: bonus score collectables
 
 ## UI
