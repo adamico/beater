@@ -27,7 +27,7 @@ class Renderer
   PELLET_SIZE_RATIO       = 0.2
   POWER_PELLET_SIZE_RATIO = 0.8
 
-  HUD_AMMO_ICON_SIZE = 24
+  HUD_AMMO_ICON_SIZE = 32
   HUD_AMMO_ICON_GAP  = 4
   HUD_AMMO_ICON_MAX_VISIBLE = 5
   HUD_AMMO_PATH = "sprites/bullet.png"
@@ -39,10 +39,10 @@ class Renderer
   HUD_TEXT_COLOR   = { r: 255, g: 255, b: 255 }.freeze
   HUD_DIM_COLOR    = { r: 200, g: 200, b: 200 }.freeze
   # Lives: row of small player-sprite icons, top-right.
-  HUD_LIFE_ICON_W  = 22
-  HUD_LIFE_ICON_H  = 33
+  HUD_LIFE_ICON_W  = 32
+  HUD_LIFE_ICON_H  = 48
   HUD_LIFE_GAP     = 6
-  HUD_LIFE_Y       = 686
+  HUD_LIFE_Y       = 660
   # Track completion: 4 colored meters across the top centre.
   HUD_METER_W      = 110
   HUD_METER_H      = 12
