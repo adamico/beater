@@ -65,10 +65,15 @@ class Pellets
     @state[[gx, gy]]
   end
 
+  # Returns the eaten entry. When this eat empties a colour (last dot of that
+  # colour), the entry carries `track_cleared: <color>` so Game can fire the
+  # G1 track-completion bonus.
   def eat(gx, gy)
     entry = @state.delete([gx, gy])
     if entry && entry[:kind] == :pellet && entry[:color]
-      @remaining_by_color[entry[:color]] -= 1
+      color = entry[:color]
+      @remaining_by_color[color] -= 1
+      entry = entry.merge(track_cleared: color) if @remaining_by_color[color] <= 0
     end
     entry
   end

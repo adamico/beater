@@ -55,6 +55,12 @@ class Game
   # Grace before game-over accepts a restart key (lets the stinger breathe).
   GAME_OVER_INPUT_GRACE_TICKS = 45
 
+  # G1: track-completion bonus — awarded when a colour's last dot is eaten.
+  TRACK_COMPLETE_BONUS    = 1000
+  TRACK_POPUP_TICKS       = EatSequencer::POPUP_TICKS
+  TRACK_POPUP_FLOAT       = EatSequencer::POPUP_FLOAT_PER_TICK
+  METER_FLASH_TICKS       = 24
+
   SPAWN_MARKER_TO_IDENTITY = {
     Tiles::SPAWN_BLINKY => :blinky,
     Tiles::SPAWN_PINKY  => :pinky,
@@ -92,6 +98,8 @@ class Game
     @lives = STARTING_LIVES
     @audio_state_for = nil
     @projectiles = []
+    @track_popups = []      # G1: Game-owned score popups for track completion
+    @meter_flash = {}       # G1: color => ticks remaining for HUD meter flash
     initialize_player
     initialize_ghosts
     enter_ready
@@ -229,6 +237,7 @@ class Game
 
   def tick_playing
     @eat_sequencer.tick(args)
+    tick_track_fx
     if @eat_sequencer.frozen?
       visible_ghosts = @ghosts.reject { |g| g.state == :eaten && !g.flashing? }
       update_camera
@@ -326,6 +335,8 @@ class Game
     initialize_ghosts
     @phase_scheduler.reset
     @eat_sequencer.reset
+    @track_popups.clear
+    @meter_flash.clear
     @audio_state_for = nil # forces set_dot_totals refresh for the new pellets
     enter_ready
   end
@@ -366,6 +377,7 @@ class Game
       camera: @camera,
       projectiles: @projectiles,
       popup: @eat_sequencer.popup,
+      track_popups: @track_popups,
       hud: hud_data,
       state: @state
     )
@@ -376,7 +388,8 @@ class Game
     {
       score: @score,
       lives: @lives,
-      completion: @pellets.completion_by_color
+      completion: @pellets.completion_by_color,
+      meter_flash: @meter_flash
     }
   end
 
@@ -426,7 +439,35 @@ class Game
       else
         args.state.audio.on_dot_collected(args, entry[:color])
       end
+
+      on_track_cleared(gx, gy, entry[:track_cleared]) if entry[:track_cleared]
     end
+  end
+
+  # G1: a colour's last dot was just eaten. Flat bonus + popup at the dot's
+  # cell + HUD meter flash + audio stinger. No world freeze (unlike eat-freeze).
+  def on_track_cleared(gx, gy, color)
+    @score += TRACK_COMPLETE_BONUS
+    rect = @projection.cell_rect(gx, gy)
+    @track_popups << {
+      x: rect[:x] + rect[:w] / 2, y: rect[:y] + rect[:h] / 2,
+      text: TRACK_COMPLETE_BONUS.to_s, alpha: 255, ticks: TRACK_POPUP_TICKS
+    }
+    @meter_flash[color] = METER_FLASH_TICKS
+    args.state.audio.on_track_complete(args)
+  end
+
+  # Advance Game-owned G1 timers: track popups (float + fade) and meter flash.
+  # Ticked every playing frame regardless of eat-freeze, like EatSequencer.
+  def tick_track_fx
+    @track_popups.each do |p|
+      p[:ticks] -= 1
+      p[:y] += TRACK_POPUP_FLOAT
+      p[:alpha] = ((p[:ticks].to_f / TRACK_POPUP_TICKS).clamp(0.0, 1.0) * 255).to_i
+    end
+    @track_popups.reject! { |p| p[:ticks] <= 0 }
+    @meter_flash.each_key { |c| @meter_flash[c] -= 1 }
+    @meter_flash.reject! { |_c, t| t <= 0 }
   end
 
   def tick_fire_input(world)

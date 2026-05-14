@@ -28,6 +28,14 @@ module Audio
         WaveGenerator.tile_to_frame(WaveGenerator.sine_period(1200))
           .first(400).map { |s| s * 0.25 }
       },
+      track_complete: -> {
+        # Bright ascending arpeggio — milestone stinger for a finished track.
+        [523, 659, 784, 1047].flat_map do |freq|
+          dur = (SR / 60.0 * 5).ceil
+          WaveGenerator.tile_to_frame(WaveGenerator.square_period(freq, duty: 0.4))
+            .first(dur).map { |s| s * 0.5 }
+        end
+      },
     }.freeze
 
     def self.play(args, sfx_name)

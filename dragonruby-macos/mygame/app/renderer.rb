@@ -20,6 +20,10 @@ class Renderer
   PELLET_COLOR_FALLBACK = { r: 255, g: 200, b: 150 }.freeze
   POWER_PELLET_COLOR = { r: 255, g: 255, b: 255 }.freeze
   POPUP_COLOR     = { r: 100, g: 220, b: 255 }.freeze
+  # G1: track-completion popup + meter-flash tint.
+  TRACK_POPUP_COLOR = { r: 255, g: 225, b: 90 }.freeze
+  METER_FLASH_COLOR = { r: 255, g: 255, b: 255 }.freeze
+  METER_FLASH_TICKS = 24
   CLIP_BACKGROUND = [0, 0, 0, 0].freeze
 
   # Pellet sizes as a fraction of the cell, so they never drift when CELL_SIZE
@@ -56,7 +60,7 @@ class Renderer
     @world_target_built = false
   end
 
-  def draw(outputs, maze, pellets, player, ghosts = [], camera:, projectiles: [], popup: nil, hud: nil, state: :playing)
+  def draw(outputs, maze, pellets, player, ghosts = [], camera:, projectiles: [], popup: nil, track_popups: [], hud: nil, state: :playing)
     @camera = camera
     outputs.background_color = BACKGROUND
     draw_world(outputs, maze)
@@ -64,6 +68,7 @@ class Renderer
     draw_actors(outputs, player, ghosts, projectiles)
     draw_hud(outputs, player, hud) if hud && state != :game_over
     draw_popup(outputs, popup) if popup
+    track_popups.each { |p| draw_popup(outputs, p, color: TRACK_POPUP_COLOR) }
     draw_state_banner(outputs, state)
     state
   end
@@ -76,7 +81,7 @@ class Renderer
       text: "SCORE #{hud[:score]}", size_enum: 4, **HUD_TEXT_COLOR
     }
     draw_hud_lives(outputs, hud[:lives])
-    draw_hud_meters(outputs, hud[:completion])
+    draw_hud_meters(outputs, hud[:completion], hud[:meter_flash])
   end
 
   def draw_hud_lives(outputs, lives)
@@ -94,8 +99,9 @@ class Renderer
     outputs.sprites << sprites
   end
 
-  def draw_hud_meters(outputs, completion)
+  def draw_hud_meters(outputs, completion, meter_flash = nil)
     return unless completion
+    meter_flash ||= {}
     total_w = HUD_METER_COLORS.size * HUD_METER_W +
               (HUD_METER_COLORS.size - 1) * HUD_METER_GAP
     start_x = (Camera::SCREEN_W - total_w) / 2
@@ -107,6 +113,14 @@ class Renderer
       solids << {
         x: x, y: HUD_METER_Y, w: (HUD_METER_W * ratio).round, h: HUD_METER_H,
         **(PELLET_COLOR_BY_KEY[color] || PELLET_COLOR_FALLBACK)
+      }
+      # G1: white overlay over the full bar, fading out over the flash window.
+      flash = meter_flash[color].to_i
+      next if flash <= 0
+      solids << {
+        x: x, y: HUD_METER_Y, w: HUD_METER_W, h: HUD_METER_H,
+        **METER_FLASH_COLOR,
+        a: (flash.to_f / METER_FLASH_TICKS * 255).to_i
       }
     end
     outputs.solids << solids
@@ -235,7 +249,7 @@ class Renderer
   end
 
   # Popup is world-anchored (spawned at a ghost centre) -> camera-transformed.
-  def draw_popup(outputs, popup)
+  def draw_popup(outputs, popup, color: POPUP_COLOR)
     project(x: popup[:x], y: popup[:y], w: 0).each do |p|
       outputs.labels << {
         x: p[:x], y: p[:y],
@@ -243,7 +257,7 @@ class Renderer
         size_enum: 4,
         alignment_enum: 1,
         vertical_alignment_enum: 1,
-        **POPUP_COLOR,
+        **color,
         a: popup[:alpha] || 255
       }
     end

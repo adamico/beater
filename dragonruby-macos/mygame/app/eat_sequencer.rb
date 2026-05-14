@@ -3,7 +3,10 @@ class EatSequencer
   EAT_PAUSE_TICKS = 16      # sim hitstop on eat (TG2)
   POPUP_TICKS = 50          # ~0.83s float+fade lifetime (TG2)
   POPUP_FLOAT_PER_TICK = 0.6
-  CHAIN_TIMEOUT_TICKS = 180 # ~3s stopgap chain reset (TG2/TG1 placeholder)
+  # G2: the eat chain is a time-windowed combo. Each kill arms this window;
+  # a kill within it escalates the award (200/400/800/1600, capped),
+  # otherwise the chain resets to 200. No frightened window any more (ADR-0007).
+  CHAIN_TIMEOUT_TICKS = 180 # ~3s at 60fps
 
   attr_accessor :eat_pause_ticks
   attr_reader :popup

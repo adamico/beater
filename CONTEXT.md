@@ -10,7 +10,7 @@ Maze chase game with a rhythm hook. Diverges from OG Pac-Man where called out. A
 
 - **Track** — one of the 4 music stems (`drums`, `bass`, `lead`, `chords`), each bound to a dot color via `Audio::Manager::DOT_COLORS` (red→drums, green→bass, blue→lead, yellow→chords). Eating a dot of a color advances its track.
 
-- **Track completion** — per-`Track` progress ratio: dots eaten of that color ÷ total dots of that color in the level. Dot-based only (not time/score). Drives the audio progression mix and the HUD's 4 track meters. Backed by a live remaining-by-color counter on `Pellets` (decremented on eat), not a rescan.
+- **Track completion** — per-`Track` progress ratio: dots eaten of that color ÷ total dots of that color in the level. Dot-based only (not time/score). Drives the audio progression mix and the HUD's 4 track meters. Backed by a live remaining-by-color counter on `Pellets` (decremented on eat), not a rescan. Reaching 100% (the colour's last dot eaten) awards a flat **1000-point track-completion bonus** (G1), fired per-track the instant the count hits 0 — with a score popup at that dot's cell, a HUD meter flash, and an audio stinger. Unlike `Eat freeze` it does not freeze the world. The popup runs on a `Game`-owned path, not `EatSequencer`.
 
 - **HUD** — screen-space overlay. Shows score (run-long total), `Life` count as a row of player-sprite icons, the `HUD ammo row`, and 4 `Track completion` meters. Visible in `ready` / `playing` / `dying`; replaced by the centered "GAME OVER" label in `game_over`.
 
@@ -30,7 +30,7 @@ Maze chase game with a rhythm hook. Diverges from OG Pac-Man where called out. A
 
 - **Body-contact** — overlap between player rect and any non-house, non-eaten ghost rect. Always fatal to the player. Originally introduced in ADR-0006 and unchanged by ADR-0007.
 
-- **Eat chain** — running multiplier (200 → 400 → 800 → 1600) applied on consecutive ghost kills, owned by `EatSequencer`. Reset boundary is currently unbounded for the level — the frightened-window reset was removed when frightened state was deleted; the planned combo-bonus rework will introduce a time-windowed reset (see [docs/TODO.md](docs/TODO.md) grill backlog).
+- **Eat chain** — time-windowed combo bonus owned by `EatSequencer` (G2). Consecutive ghost kills escalate the award through 200 → 400 → 800 → 1600 (capped). Each kill arms a `CHAIN_TIMEOUT_TICKS` window (180 ticks, ~3s); a kill within the window escalates, otherwise the chain resets to 200. Replaces the OG frightened-window chain — frightened state was deleted in [ADR-0007](docs/adr/0007-finite-ammo-manual-fire.md), so the chain is now bounded only by the timer, not by a power-pellet window.
 
 - **Eat freeze** — short pause the game enters when a ghost is killed; popup is shown via `EatSequencer.popup`. Other contacts cannot resolve during the freeze. Retained under ADR-0007; tuning deferred to playtest.
 

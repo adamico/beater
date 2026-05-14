@@ -71,6 +71,11 @@ module Audio
       SFXPlayer.play(args, :power_pellet)
     end
 
+    # G1: a Track reached 100% completion — milestone stinger.
+    def on_track_complete(args)
+      SFXPlayer.play(args, :track_complete)
+    end
+
     def on_enemy_eaten(args, sequence: 1)
       SFXPlayer.play(args, :enemy_eaten)
     end

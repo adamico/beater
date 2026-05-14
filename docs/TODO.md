@@ -8,8 +8,6 @@
 
 ## Gameplay
 
-- G1: score system (points for eating dots, points for eating ghosts with chain reaction bonus, points for completing tracks)
-- G2: rework the "eat" score bonus: instead of the OG 200/400/800/1600 chain tied to a single frightened window, turn it into a time-windowed combo bonus (kill another ghost within T ticks of the last kill to escalate; resets if timer lapses).
 - G4: add more levels inspired by the OG.
 - G5: bonus score collectables
 
