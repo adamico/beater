@@ -8,7 +8,9 @@ At 16:9 the static whole-maze view left ~53% of the screen empty and made the pl
 
 > **Note:** `CELL_SIZE` was initially set to 96 (sprite fits one cell). Playtest landed on 48 — half the sprite height — with the sprite overhanging its logical 1-cell rect. The half-sprite-height derivation is the durable rule; the exact px value follows the sprite asset.
 
-The camera is **asymmetric by axis**, a direct consequence of the maze topology (ADR-0001): **Y clamps** to maze bounds (never shows void above/below), **X never clamps** — it follows freely and the world is drawn **modulo world-width**, so seam-straddling content is drawn twice and tiles seamlessly. This replaces ADR-0002's static clipped target. Follow style is hard-lock (camera centre = player centre) with eased directional look-ahead deferred to playtest.
+The camera is **asymmetric by axis**, a direct consequence of the maze topology (ADR-0001): **Y clamps** to maze bounds (never shows void above/below), **X never clamps** — it follows freely and the world is drawn **modulo world-width**, so seam-straddling content is drawn twice and tiles seamlessly. This replaces ADR-0002's static clipped target. Follow style is hard-lock (camera centre = player centre).
+
+**Directional look-ahead** (TG3, resolved in playtest): the camera leads the player along the travel axis by an eased 2D offset — target = `direction * lead-cells * CELL_SIZE`, eased per-frame (`offset += (target - offset) * ease`), decaying to zero when the player is stopped. The lead is configured per-axis in **cells** (`LOOK_AHEAD_CELLS_X/Y`) rather than as a viewport fraction: a 16:9 viewport already shows less vertically, so leading the same cell count both ways deliberately spends more of the budget on the scarce vertical dimension. The Y-clamp is applied *after* the offset, so look-ahead near the maze top/bottom is simply clamped away. The minimap idea floated in TG3 was dropped — the level is small and ghosts are usually already on-screen.
 
 ## Considered Options
 

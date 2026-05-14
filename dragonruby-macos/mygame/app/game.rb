@@ -66,7 +66,8 @@ class Game
     @renderer = Renderer.new(@projection)
     @camera = Camera.new(
       world_w: CELL_SIZE * @maze.width,
-      world_h: CELL_SIZE * @maze.height
+      world_h: CELL_SIZE * @maze.height,
+      cell_size: CELL_SIZE
     )
     @spawn_cells = scan_spawn_cells
     @player_spawn = scan_player_spawn
@@ -179,7 +180,8 @@ class Game
   def update_camera
     @camera.follow(
       @player.x + @player.w / 2.0,
-      @player.y + @player.h / 2.0
+      @player.y + @player.h / 2.0,
+      @player.direction
     )
   end
 
