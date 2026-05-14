@@ -19,8 +19,9 @@ class Player
     init_grid_mover(x: x, y: y, w: w, h: h, speed: speed, direction: direction)
     @controller = controller
     @base_speed = speed.to_f
-    # Sprite renders native (ADR-0008): CELL_SIZE = 96 was chosen so the 64x96
-    # canvas fits one cell unscaled. Centre it within the logical cell rect.
+    # Sprite renders native (ADR-0008). CELL_SIZE is half the sprite height, so
+    # the 64x96 canvas spans a 2x2 cell area; centre it on the logical 1-cell
+    # rect (the offsets are negative — the sprite overhangs the cell).
     @sprite_offset_x = (w - PLAYER_SPRITE_WIDTH) / 2.0
     @sprite_offset_y = (h - PLAYER_SPRITE_HEIGHT) / 2.0
 

@@ -26,8 +26,11 @@ class Game
   LEVEL_BPM = 128
   CELLS_PER_BEAT = 4.0
 
-  CELL_SIZE = 48
-  PROJECTILE_SIZE = (CELL_SIZE * 0.42).round
+  # Half the player sprite height (ADR-0008): a 2-cell-wide tunnel then spans
+  # exactly one sprite height, so the player fits the tunnel cleanly. Camera
+  # still runs at zoom 1.0; the sprite renders native across a 2x2 cell span.
+  CELL_SIZE = Player::PLAYER_SPRITE_HEIGHT / 2
+  PROJECTILE_SIZE = CELL_SIZE * 2
   FRAMES_PER_BEAT = (Audio::BeatClock::FPS * 60.0) / LEVEL_BPM
   FRAMES_PER_CELL = FRAMES_PER_BEAT / CELLS_PER_BEAT
   PLAYER_SPEED = CELL_SIZE / FRAMES_PER_CELL

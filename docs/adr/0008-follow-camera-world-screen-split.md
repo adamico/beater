@@ -2,9 +2,11 @@
 
 > **Status:** accepted. Supersedes [ADR-0002](0002-tunnel-wrap-clipped-render-target.md).
 
-At 16:9 the static whole-maze view left ~53% of the screen empty and made the player sprite read tiny; the sprite's tall 64×96 canvas also cramped maze design (TG3). We split coordinates into **world space** (authoritative — all gameplay, physics, collision, beat-sync; unit `CELL_SIZE = 96` world px) and **screen space** (the 1280×720 output), bridged by a render-only **Camera** that follows the player so a zoomed-in maze scrolls. No gameplay code knows the camera exists.
+At 16:9 the static whole-maze view left ~53% of the screen empty and made the player sprite read tiny; the sprite's tall 64×96 canvas also cramped maze design (TG3). We split coordinates into **world space** (authoritative — all gameplay, physics, collision, beat-sync; the unit is the cell) and **screen space** (the 1280×720 output), bridged by a render-only **Camera** that follows the player so a zoomed-in maze scrolls. No gameplay code knows the camera exists.
 
-`CELL_SIZE` is set to **96** specifically so the 64×96 player sprite renders **native and unscaled** — it fills one cell vertically, killing the "tall sprite constrains the maze" problem — and so the camera runs at a fixed integer **`zoom = 1.0`** (96 screen px/cell, pixel-perfect, ~13×7.5 cells visible). `zoom` stays a real `Camera` parameter for future settings/accessibility but is not exposed or animated.
+`CELL_SIZE` is derived as **half the player sprite height** (`Player::PLAYER_SPRITE_HEIGHT / 2` = 48 world px). The sprite renders **native and unscaled**, spanning a 2×2 cell area — playtest showed this reads better than a 1-cell sprite: a 2-cell-wide tunnel then spans exactly one sprite height, so the player fits the tunnel cleanly and the tall canvas no longer cramps maze design. The camera runs at a fixed integer **`zoom = 1.0`** (48 screen px/cell, pixel-perfect). `zoom` stays a real `Camera` parameter for future settings/accessibility but is not exposed or animated.
+
+> **Note:** `CELL_SIZE` was initially set to 96 (sprite fits one cell). Playtest landed on 48 — half the sprite height — with the sprite overhanging its logical 1-cell rect. The half-sprite-height derivation is the durable rule; the exact px value follows the sprite asset.
 
 The camera is **asymmetric by axis**, a direct consequence of the maze topology (ADR-0001): **Y clamps** to maze bounds (never shows void above/below), **X never clamps** — it follows freely and the world is drawn **modulo world-width**, so seam-straddling content is drawn twice and tiles seamlessly. This replaces ADR-0002's static clipped target. Follow style is hard-lock (camera centre = player centre) with eased directional look-ahead deferred to playtest.
 
@@ -17,7 +19,7 @@ The camera is **asymmetric by axis**, a direct consequence of the maze topology 
 
 ## Consequences
 
-- One **static `world_target`** render target holds walls only (drawn once, 2880×3264). Pellets stay live primitives (cheap, ~240/frame, and the minimap gets them for free); actors/projectiles are always live primitives on top. Main view blits the camera sub-rect 1–2× for the seam.
+- One **static `world_target`** render target holds walls only (drawn once, sized `playfield_w × playfield_h`). Pellets stay live primitives (cheap, ~240/frame, and the minimap gets them for free); actors/projectiles are always live primitives on top. Main view blits the camera sub-rect 1–2× for the seam.
 - `GridProjection` keeps grid→world mapping but its `offset_x/offset_y` go to 0 (`OFFSET_X`/`OFFSET_Y` deleted) — all translation moves into the `Camera`. `Game` owns `@camera`, updates it after player movement, before render.
 - World-space sizes (pellets, sprites) become `CELL_SIZE`-relative so they never drift again; the player sprite-scale chain is deleted. Screen-space UI (HUD ammo row) is tuned against the viewport directly. The eat-freeze popup is world-anchored and camera-transformed.
 - Input needs no inverse transform — control is keyboard-only, no screen→world picking.
