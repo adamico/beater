@@ -30,14 +30,14 @@ module Audio
 
   TRACK_CONFIGS = {
     drums: TrackConfig.new(
-      start_cutoff:     800,    end_cutoff:     7_000,
+      start_cutoff:     400,    end_cutoff:     7_000,
       start_resonance:  2.5,    end_resonance:  0.5,
-      start_gain:       0.2,    end_gain:       0.6
+      start_gain:       0.3,    end_gain:       0.6
     ),
     bass: TrackConfig.new(
-      start_cutoff:     500,    end_cutoff:     7_000,
+      start_cutoff:     200,    end_cutoff:     7_000,
       start_resonance:  nil,    end_resonance:  nil,
-      start_gain:       0.2,    end_gain:       0.6
+      start_gain:       0.2,    end_gain:       0.7
     ),
     lead: TrackConfig.new(
       start_cutoff:     600,    end_cutoff:     7_000,
