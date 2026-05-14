@@ -23,3 +23,9 @@ Maze chase game with a rhythm hook. Diverges from OG Pac-Man where called out. A
 - **Tunnel** — explicit `t`-marked cell that slows ghosts and wraps movement toroidally on X. See [ADR-0005](docs/adr/0005-explicit-tunnel-tile.md), [ADR-0001](docs/adr/0001-toroidal-maze-x-axis.md).
 
 - **Role** — passability class on a tile (player, ghost, ghost-eaten, ghost-leaving). Drives which actors can enter. See [ADR-0004](docs/adr/0004-passability-roles-via-tiles.md).
+
+- **World space** — authoritative coordinate space for all gameplay, physics, collision and beat-sync. Unit is the cell: `CELL_SIZE = 96` world px (chosen so the 64×96 player sprite renders native, unscaled, fitting one cell vertically). Frozen w.r.t. the camera — no gameplay code knows the camera exists.
+
+- **Screen space** — final pixel space of the 1280×720 output. HUD and popups live here directly. Actors / maze / pellets live in world space and are mapped to screen space by the **Camera**.
+
+- **Camera** — pure view transform (world → screen): a `zoom` factor plus translation. Render-only; never feeds back into physics. Follows the player (hard-lock) so the zoomed-in maze scrolls: Y clamps to maze bounds, X follows freely and draws the world modulo world-width. Fixed `zoom = 1.0`. See [ADR-0008](docs/adr/0008-follow-camera-world-screen-split.md).

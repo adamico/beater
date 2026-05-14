@@ -6,6 +6,8 @@ require 'app/tiles.rb'
 # wall hit or ghost contact. Spawned at the player's logical center while
 # the frightened window is active; see docs/adr/0006-power-pellet-projectiles.md.
 class Projectile
+  # Default size; Game passes a CELL_SIZE-relative value (ADR-0008). Kept as a
+  # constant so size-agnostic tests can reference it symbolically.
   SIZE = 40
   SPRITE_PATH = "sprites/bullet.png"
   SPRITE_TILE_WIDTH = 32
@@ -15,11 +17,11 @@ class Projectile
 
   attr_reader :direction, :x, :y, :w, :h
 
-  def initialize(cx:, cy:, direction:, speed:)
-    @x = cx - SIZE / 2.0
-    @y = cy - SIZE / 2.0
-    @w = SIZE
-    @h = SIZE
+  def initialize(cx:, cy:, direction:, speed:, size: SIZE)
+    @x = cx - size / 2.0
+    @y = cy - size / 2.0
+    @w = size
+    @h = size
     @direction = direction
     @speed = speed.to_f
     @dead = false

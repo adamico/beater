@@ -4,7 +4,7 @@
 
 - TG1: rework the "eat" score bonus: instead of the OG 200/400/800/1600 chain tied to a single frightened window, turn it into a time-windowed combo bonus (kill another ghost within T ticks of the last kill to escalate; resets if timer lapses).
   
-- TG3: - maze cell dimensions needs to be tweaked to accomodate for the player sprite size which looks too small at 16:9 resolution
+- TG3: ✅ grilled — resolved as a follow camera with a world/screen split, `CELL_SIZE = 96`, fixed `zoom = 1.0`, asymmetric Y-clamp/X-toroidal. See [ADR-0008](adr/0008-follow-camera-world-screen-split.md). Implementation still pending.
 
 # First vertical slice MVP
 

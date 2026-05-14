@@ -26,13 +26,13 @@ end
 
 def rhythm_world
   maze = Maze.from_layout(RHYTHM_LAYOUT_5X5)
-  projection = GridProjection.new(cell_size: 20, offset_x: 0, offset_y: 0, grid_w: 5, grid_h: 5)
+  projection = GridProjection.new(cell_size: 20, grid_w: 5, grid_h: 5)
   [maze, projection]
 end
 
 def corridor_world
   maze = Maze.from_layout(RHYTHM_CORRIDOR_LAYOUT_5X5)
-  projection = GridProjection.new(cell_size: 20, offset_x: 0, offset_y: 0, grid_w: 5, grid_h: 5)
+  projection = GridProjection.new(cell_size: 20, grid_w: 5, grid_h: 5)
   [maze, projection]
 end
 

@@ -14,7 +14,7 @@ PROJECTILE_LAYOUT_5X5 = [
 
 def projectile_world
   maze = Maze.from_layout(PROJECTILE_LAYOUT_5X5)
-  projection = GridProjection.new(cell_size: 20, offset_x: 0, offset_y: 0, grid_w: 5, grid_h: 5)
+  projection = GridProjection.new(cell_size: 20, grid_w: 5, grid_h: 5)
   [maze, projection]
 end
 

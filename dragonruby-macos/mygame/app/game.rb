@@ -1,5 +1,6 @@
 require 'app/tiles.rb'
 require 'app/grid_projection.rb'
+require 'app/camera.rb'
 require 'app/maze.rb'
 require 'app/pellets.rb'
 require 'app/direction.rb'
@@ -25,9 +26,8 @@ class Game
   LEVEL_BPM = 128
   CELLS_PER_BEAT = 4.0
 
-  CELL_SIZE = 20
-  OFFSET_X = CELL_SIZE * 16
-  OFFSET_Y = CELL_SIZE * 2
+  CELL_SIZE = 48
+  PROJECTILE_SIZE = (CELL_SIZE * 0.42).round
   FRAMES_PER_BEAT = (Audio::BeatClock::FPS * 60.0) / LEVEL_BPM
   FRAMES_PER_CELL = FRAMES_PER_BEAT / CELLS_PER_BEAT
   PLAYER_SPEED = CELL_SIZE / FRAMES_PER_CELL
@@ -56,11 +56,15 @@ class Game
   def initialize
     @maze = Maze.from_layout(MapLayouts::PACMAN_LAYOUT)
     @projection = GridProjection.new(
-      cell_size: CELL_SIZE, offset_x: OFFSET_X, offset_y: OFFSET_Y,
+      cell_size: CELL_SIZE,
       grid_w: @maze.width, grid_h: @maze.height
     )
     @pellets = Pellets.from_maze(@maze)
     @renderer = Renderer.new(@projection)
+    @camera = Camera.new(
+      world_w: CELL_SIZE * @maze.width,
+      world_h: CELL_SIZE * @maze.height
+    )
     @spawn_cells = scan_spawn_cells
     @player_spawn = scan_player_spawn
     @above_door_cell = @spawn_cells[:blinky]
@@ -168,6 +172,14 @@ class Game
     end
   end
 
+  # Point the camera at the player centre. Render-only; called before each draw.
+  def update_camera
+    @camera.follow(
+      @player.x + @player.w / 2.0,
+      @player.y + @player.h / 2.0
+    )
+  end
+
   def tick
     ensure_audio_state
     args.state.audio.tick(args)
@@ -176,7 +188,8 @@ class Game
     if @level_complete
       args.state.audio.on_level_complete_duck_clear(args)
       request_reset_if_any_key
-      @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, popup: @eat_sequencer.popup, level_complete: true)
+      update_camera
+      @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, camera: @camera, popup: @eat_sequencer.popup, level_complete: true)
       draw_audio_debug_watch if args.state.debug_audio
       return
     end
@@ -184,7 +197,8 @@ class Game
     @eat_sequencer.tick(args)
     if @eat_sequencer.frozen?
       visible_ghosts = @ghosts.reject { |g| g.state == :eaten && !g.flashing? }
-      @renderer.draw(outputs, @maze, @pellets, @player, visible_ghosts, popup: @eat_sequencer.popup, level_complete: false)
+      update_camera
+      @renderer.draw(outputs, @maze, @pellets, @player, visible_ghosts, camera: @camera, popup: @eat_sequencer.popup, level_complete: false)
       draw_audio_debug_watch if args.state.debug_audio
       return
     end
@@ -202,8 +216,9 @@ class Game
     )
 
     tick_player(world)
+    update_camera
     if check_level_complete
-      @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, popup: @eat_sequencer.popup, level_complete: true)
+      @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, camera: @camera, popup: @eat_sequencer.popup, level_complete: true)
       draw_audio_debug_watch if args.state.debug_audio
       return
     end
@@ -211,7 +226,7 @@ class Game
     tick_fire_input(world)
     tick_projectiles
     tick_collisions
-    @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, projectiles: @projectiles, popup: @eat_sequencer.popup, level_complete: false)
+    @renderer.draw(outputs, @maze, @pellets, @player, @ghosts, camera: @camera, projectiles: @projectiles, popup: @eat_sequencer.popup, level_complete: false)
     draw_audio_debug_watch if args.state.debug_audio
   end
 
@@ -277,7 +292,8 @@ class Game
     cx = @player.x + @player.w / 2.0
     cy = @player.y + @player.h / 2.0
     @projectiles << Projectile.new(
-      cx: cx, cy: cy, direction: @player.direction, speed: PROJECTILE_SPEED
+      cx: cx, cy: cy, direction: @player.direction,
+      speed: PROJECTILE_SPEED, size: PROJECTILE_SIZE
     )
   end
 

@@ -31,7 +31,7 @@ class Ghost
     @state = new_state
   end
 
-  def initialize(identity:, x:, y:, w:, h:, speed:, scatter_target:, spawn_cell:, controller:, direction: Direction::LEFT, sprite_scale: 2.0, sprite_offset_x: nil, sprite_offset_y: nil)
+  def initialize(identity:, x:, y:, w:, h:, speed:, scatter_target:, spawn_cell:, controller:, direction: Direction::LEFT, sprite_scale: 1.0, sprite_offset_x: nil, sprite_offset_y: nil)
     init_grid_mover(x: x, y: y, w: w, h: h, speed: speed, direction: direction)
     @identity = identity
     @scatter_target = scatter_target

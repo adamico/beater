@@ -20,7 +20,7 @@ end
 
 def make_latch_world(layout)
   maze = Maze.from_layout(layout)
-  projection = GridProjection.new(cell_size: 1, offset_x: 0, offset_y: 0, grid_w: layout[0].size, grid_h: layout.size)
+  projection = GridProjection.new(cell_size: 1, grid_w: layout[0].size, grid_h: layout.size)
   Struct.new(:maze, :projection).new(maze, projection)
 end
 
@@ -101,7 +101,7 @@ def test_update_clears_targeting_latch_on_no_move args, assert
     %w(www)
   ]
   maze = Maze.from_layout(layout)
-  projection = GridProjection.new(cell_size: 20, offset_x: 0, offset_y: 0, grid_w: 3, grid_h: 3)
+  projection = GridProjection.new(cell_size: 20, grid_w: 3, grid_h: 3)
 
   # Simulate a prior Targeting decision committed in (1,1).
   GhostControllers::Targeting.instance_variable_get(:@last_decision_cell)[:test_stuck_recover] = [1, 1]

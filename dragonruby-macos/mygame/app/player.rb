@@ -9,7 +9,6 @@ class Player
   PLAYER_SPRITE_PATH = "sprites/player.png"
   PLAYER_SPRITE_WIDTH = 64
   PLAYER_SPRITE_HEIGHT = 96
-  PLAYER_SPRITE_SCALE = 1.2
 
   attr_accessor :controller
   attr_reader :move_state, :commit_direction, :rhythm_fallback, :ammo
@@ -20,11 +19,10 @@ class Player
     init_grid_mover(x: x, y: y, w: w, h: h, speed: speed, direction: direction)
     @controller = controller
     @base_speed = speed.to_f
-    @sprite_scale = PLAYER_SPRITE_SCALE
-    @sprite_render_w = w * @sprite_scale
-    @sprite_render_h = @sprite_render_w * (PLAYER_SPRITE_HEIGHT.to_f / PLAYER_SPRITE_WIDTH)
-    @sprite_offset_x = (@sprite_render_w - w) / 2.0
-    @sprite_offset_y = (@sprite_render_h - h) / 2.0
+    # Sprite renders native (ADR-0008): CELL_SIZE = 96 was chosen so the 64x96
+    # canvas fits one cell unscaled. Centre it within the logical cell rect.
+    @sprite_offset_x = (w - PLAYER_SPRITE_WIDTH) / 2.0
+    @sprite_offset_y = (h - PLAYER_SPRITE_HEIGHT) / 2.0
 
     @rhythm_enabled = false
     @rhythm_bpm = Audio::BeatClock::DEFAULT_BPM
@@ -75,14 +73,16 @@ class Player
   DOT_SLOW_TICKS = 4
   DOT_SLOW_FACTOR = 0.9
 
-  # OG-style cornering: Pac may start a turn this many pixels before
-  # reaching cell center. Ghosts keep the default (speed + ε), so Pac
-  # gains a small distance edge through corners. See
-  # docs/OG/ghosts_behav.md "Cornering".
-  CORNER_TOLERANCE_PX = 5.0
+  # OG-style cornering: Pac may start a turn this far before reaching cell
+  # center. Expressed as a multiple of per-tick step so the turn window stays
+  # wider than one movement step at any CELL_SIZE/speed (a fixed px value
+  # smaller than @speed makes intersections un-turnable on most ticks).
+  # Ghosts keep the default (speed + ε), so Pac gains a small distance edge
+  # through corners. See docs/OG/ghosts_behav.md "Cornering".
+  CORNER_TOLERANCE_SPEED_RATIO = 1.75
 
   def corner_snap_tolerance
-    CORNER_TOLERANCE_PX
+    @base_speed * CORNER_TOLERANCE_SPEED_RATIO
   end
 
   def snap_perpendicular_on_turn?
@@ -185,9 +185,9 @@ class Player
     frame = @walk_ticks.idiv(TICKS_PER_WALK_FRAME) % WALK_FRAME_COUNT
     tile_index = WALK_FRAME_START + frame
     base = {
-      x: @x - @sprite_offset_x + @visual_offset_x,
-      y: @y - @sprite_offset_y + @visual_offset_y,
-      w: @sprite_render_w, h: @sprite_render_h,
+      x: @x + @sprite_offset_x + @visual_offset_x,
+      y: @y + @sprite_offset_y + @visual_offset_y,
+      w: PLAYER_SPRITE_WIDTH, h: PLAYER_SPRITE_HEIGHT,
       path: PLAYER_SPRITE_PATH,
       tile_x: tile_index * PLAYER_SPRITE_WIDTH,
       tile_y: 0,
