@@ -122,6 +122,13 @@ module Audio
       sync_gains(args)
     end
 
+    # New level started: track filters re-close to their configured initial
+    # values (undoing on_level_complete's unlock_all).
+    def on_level_start(args)
+      @progression.reset_progress
+      sync_gains(args)
+    end
+
     def set_track_config(track, **overrides)
       raise ArgumentError, "Unknown track '#{track}'" unless TRACKS.include?(track)
       @progression.set_config(track, **overrides)

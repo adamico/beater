@@ -27,6 +27,15 @@ module Audio
       @tracks.each { |t| @completion[t] = 1.0 }
     end
 
+    # New-level reset: dot counts and completion return to their initial
+    # zero state so the filters re-close to each track's start_cutoff/gain.
+    def reset_progress
+      @tracks.each do |t|
+        @dot_counts[t] = 0
+        @completion[t] = 0.0
+      end
+    end
+
     def completion
       @completion
     end
