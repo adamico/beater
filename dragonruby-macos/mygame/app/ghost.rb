@@ -4,7 +4,7 @@ require 'app/grid_mover.rb'
 require 'app/tiles.rb'
 require 'app/ghost_controllers.rb'
 
-GHOST_DEBUG_LOGS = true
+GHOST_DEBUG_LOGS = false
 
 class Ghost
   include GridMover
