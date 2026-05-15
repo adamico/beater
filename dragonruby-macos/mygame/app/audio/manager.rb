@@ -3,6 +3,7 @@ require 'app/audio/beat_clock.rb'
 require 'app/audio/duck_controller.rb'
 require 'app/audio/track_progression.rb'
 require 'app/audio/sfx_player.rb'
+require 'app/game_settings.rb'
 
 module Audio
   class Manager
@@ -151,11 +152,12 @@ module Audio
     end
 
     def sync_gains(args)
+      music_bus = GameSettings.music_gain
       TRACKS.each do |n|
         cutoff_hz, gain = @progression.params(n)
         @players[n].apply_mix_settings(
           args,
-          gain: gain,
+          gain: gain * music_bus,
           cutoff_hz: cutoff_hz,
           resonance: nil,
           duck_multiplier: duck_gain_multiplier,

@@ -1,3 +1,5 @@
+require 'app/game_settings.rb'
+
 module Audio
   module SFXPlayer
     SR = MusicTheory::SAMPLE_RATE.to_f
@@ -98,7 +100,7 @@ module Audio
           pos_ref[0] += chunk.length
           chunk
         }],
-        gain: gain || entry[:gain] || DEFAULT_GAIN,
+        gain: (gain || entry[:gain] || DEFAULT_GAIN) * GameSettings.sfx_gain,
         looping: false,
         paused: false,
         stop_at: args.tick_count + (cached.length / (SR / 60.0)).ceil + 2

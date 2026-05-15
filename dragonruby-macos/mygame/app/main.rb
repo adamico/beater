@@ -1,37 +1,44 @@
-require 'app/audio/music_theory.rb'
-require 'app/audio/wave_generator.rb'
-require 'app/audio/track_config.rb'
-require 'app/audio/beat_clock.rb'
-require 'app/audio/track_library.rb'
-require 'app/audio/native_bridge.rb'
-require 'app/audio/track_player.rb'
-require 'app/audio/sfx_player.rb'
-require 'app/audio/manager.rb'
+require 'app/audio/music_theory'
+require 'app/audio/wave_generator'
+require 'app/audio/track_config'
+require 'app/audio/beat_clock'
+require 'app/audio/track_library'
+require 'app/audio/native_bridge'
+require 'app/audio/track_player'
+require 'app/audio/sfx_player'
+require 'app/audio/manager'
 
 PROGRESSION_TESTER_MODE = (
   File.exist?('mygame/tmp/progression_tester_mode') ||
   File.exist?('tmp/progression_tester_mode')
 ).freeze
 
-require 'tools/progression_tester.rb' if PROGRESSION_TESTER_MODE
+require 'tools/progression_tester' if PROGRESSION_TESTER_MODE
 unless PROGRESSION_TESTER_MODE
-  require 'app/game.rb'
-  require 'app/scenes/scene_director.rb'
-  require 'app/scenes/menu_input.rb'
-  require 'app/scenes/menu_controller.rb'
-  require 'app/scenes/menu_renderer.rb'
-  require 'app/scenes/title.rb'
+  require 'app/game_settings'
+  require 'app/game'
+  require 'app/scenes/scene_director'
+  require 'app/scenes/scene_layout'
+  require 'app/scenes/scrollable_list'
+  require 'app/scenes/menu_input'
+  require 'app/scenes/menu_controller'
+  require 'app/scenes/menu_renderer'
+  require 'app/scenes/menu_scene'
+  require 'app/scenes/title'
+  require 'app/scenes/settings'
 end
 
-def boot args
+def boot(_args)
   begin
     DR.ffi_misc.gtk_dlopen('audio_stem_fx')
   rescue StandardError
     # Native bridge will fall back to legacy mode if loading fails.
   end
+  GameSettings.load!
+  GameSettings.apply_window!
 end
 
-def tick args
+def tick(args)
   if PROGRESSION_TESTER_MODE
     ProgressionTester.tick(args)
     return
@@ -45,6 +52,9 @@ def tick args
   case SceneDirector.current
   when :title
     $title.tick(args)
+  when :settings
+    $settings ||= Scenes::Settings.new
+    $settings.tick(args)
   when :playing
     $game ||= Game.new
     $game.args = args
@@ -52,9 +62,11 @@ def tick args
     SceneDirector.draw_fade(args.outputs) if SceneDirector.transitioning?
   end
 
-  if args.state.request_game_reset
-    reset(args)
-  end
+  Scenes::SceneLayout.tick_debug(args)
+
+  return unless args.state.request_game_reset
+
+  reset(args)
 end
 
 # Runs once per scene swap, at the fade apex. Build/teardown live `Game`,
@@ -62,19 +74,25 @@ end
 def apply_scene_swap(args)
   case SceneDirector.current
   when :title
+    # Returning to title from anywhere drops the run.
     $game = nil
+    $settings = nil
     Audio::NativeBridge.reset_runtime_state!
     args.state.audio = nil
   when :playing
+    # Settings → playing keeps the existing Game (pause survives the round-trip).
+    $settings = nil
     if $game.nil?
       Audio::NativeBridge.reset_runtime_state!
       args.state.audio = nil
       $game = Game.new
     end
+  when :settings
+    # Settings can be reached from title or pause — both keep $game intact.
   end
 end
 
-def reset args
+def reset(args)
   $game = nil
   Audio::NativeBridge.reset_runtime_state!
   args.state.audio = nil

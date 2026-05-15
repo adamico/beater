@@ -231,8 +231,12 @@ class Game
     end
   end
 
-  PAUSE_ITEMS = %i[resume exit_to_title].freeze
-  PAUSE_LABELS = { resume: 'RESUME', exit_to_title: 'EXIT TO TITLE' }.freeze
+  PAUSE_ITEMS = %i[resume settings exit_to_title].freeze
+  PAUSE_LABELS = {
+    resume: 'RESUME',
+    settings: 'SETTINGS',
+    exit_to_title: 'EXIT TO TITLE'
+  }.freeze
   PAUSE_ITEM_W = 320
   PAUSE_ITEM_H = 52
   PAUSE_ITEM_GAP = 14
@@ -285,6 +289,7 @@ class Game
   def activate_pause_item
     case PAUSE_ITEMS[@pause_selected]
     when :resume        then exit_paused
+    when :settings      then SceneDirector.request(:settings, return_to: :playing)
     when :exit_to_title then SceneDirector.request(:title)
     end
   end

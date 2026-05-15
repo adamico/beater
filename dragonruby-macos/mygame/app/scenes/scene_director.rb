@@ -45,6 +45,11 @@ module SceneDirector
         if @phase_t >= FADE_FRAMES
           @current = @requested
           @requested = nil
+          # `return_to` is NOT cleared here — it must survive the swap so
+          # the destination scene (e.g. Settings) can read it when the user
+          # cancels back. Callers entering a sub-scene always pass
+          # `return_to:` explicitly, so a stale value never leaks across
+          # unrelated flows.
           yield :swap if block_given?
           @phase = :fading_in
           @phase_t = 0

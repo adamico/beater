@@ -2,14 +2,21 @@ require 'app/scenes/scene_director'
 require 'app/scenes/menu_input'
 require 'app/scenes/menu_controller'
 require 'app/scenes/menu_renderer'
+require 'app/scenes/menu_scene'
 
 module Scenes
   class Title
+    include MenuScene
     TITLE = 'BEAT2R'
     TAGLINE = 'Maze. Beat. Repeat.'
     CREDITS = 'kc00l @ Fifth Layer Studio 2026'
-    ITEMS = %i[play instructions quit].freeze
-    LABELS = { play: 'PLAY', instructions: 'INSTRUCTIONS', quit: 'QUIT' }.freeze
+    ITEMS = %i[play settings instructions quit].freeze
+    LABELS = {
+      play: 'PLAY',
+      settings: 'SETTINGS',
+      instructions: 'INSTRUCTIONS',
+      quit: 'QUIT'
+    }.freeze
 
     ITEM_W = 280
     ITEM_H = 56
@@ -23,26 +30,25 @@ module Scenes
     end
 
     def tick(args)
-      handle_input(args) unless SceneDirector.transitioning?
+      handle_menu_input(args)
       render(args)
     end
 
     private
 
-    def handle_input(args)
-      result = MenuController.update(
-        args, selected: @selected, count: ITEMS.length, item_rects: item_rects
-      )
-      @selected = result[:selected]
-      activate if result[:action] == :activate
-    end
+    def item_count = ITEMS.length
 
-    def activate
+    def on_activate(_args)
       case ITEMS[@selected]
       when :play then SceneDirector.request(:playing)
+      when :settings then SceneDirector.request(:settings, return_to: :title)
       when :instructions then SceneDirector.request(:instructions)
       when :quit then $gtk.request_quit
       end
+    end
+
+    def on_cancel(_args)
+      # Title has nowhere to go back to — Quit is an explicit menu item.
     end
 
     def item_rects

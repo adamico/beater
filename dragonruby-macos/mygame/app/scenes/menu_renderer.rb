@@ -47,7 +47,7 @@ module Scenes
     def self.draw_heading(outputs, text, x:, y:, size: 14)
       outputs.primitives << {
         x: x, y: y, text: text,
-        size_enum: size, alignment_enum: 1,
+        size_enum: size, alignment_enum: 1, vertical_alignment_enum: 1,
         **HEADING_COLOR
       }.label!
     end
@@ -58,6 +58,42 @@ module Scenes
         x: 0, y: 0, w: w, h: h,
         r: 0, g: 0, b: 0, a: alpha
       }.solid!
+    end
+
+    # Settings row: left-aligned label, right-aligned value, optional fill
+    # bar for sliders. `value_ratio` (0..1) draws the slider track + thumb;
+    # pass nil for non-slider rows (toggles, static).
+    def self.draw_setting_row(outputs, rect, label:, value_text:, selected:, value_ratio: nil)
+      fill = selected ? SELECTED_FILL : UNSELECTED_FILL
+      border = selected ? SELECTED_BORDER : UNSELECTED_BORDER
+
+      outputs.primitives << rect.merge(fill).solid!
+      outputs.primitives << rect.merge(border).border!
+
+      outputs.primitives << {
+        x: rect[:x] + 18, y: rect[:y] + rect[:h] / 2,
+        text: label, size_enum: 3, alignment_enum: 0, vertical_alignment_enum: 1,
+        **LABEL_COLOR
+      }.label!
+
+      if value_ratio
+        track_x = rect[:x] + rect[:w] - 260
+        track_y = rect[:y] + rect[:h] / 2 - 4
+        track_w = 180
+        outputs.primitives << {
+          x: track_x, y: track_y, w: track_w, h: 8, r: 60, g: 60, b: 70
+        }.solid!
+        outputs.primitives << {
+          x: track_x, y: track_y, w: (track_w * value_ratio).to_i, h: 8,
+          r: 255, g: 200, b: 80
+        }.solid!
+      end
+
+      outputs.primitives << {
+        x: rect[:x] + rect[:w] - 18, y: rect[:y] + rect[:h] / 2,
+        text: value_text, size_enum: 3, alignment_enum: 2, vertical_alignment_enum: 1,
+        **LABEL_COLOR
+      }.label!
     end
   end
 end
