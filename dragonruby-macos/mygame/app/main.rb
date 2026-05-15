@@ -8,30 +8,22 @@ require 'app/audio/track_player'
 require 'app/audio/sfx_player'
 require 'app/audio/manager'
 
-PROGRESSION_TESTER_MODE = (
-  File.exist?('mygame/tmp/progression_tester_mode') ||
-  File.exist?('tmp/progression_tester_mode')
-).freeze
-
-require 'tools/progression_tester' if PROGRESSION_TESTER_MODE
-unless PROGRESSION_TESTER_MODE
-  require 'app/game_settings'
-  require 'app/highscores'
-  require 'app/game'
-  require 'app/scenes/scene_director'
-  require 'app/scenes/scene_layout'
-  require 'app/scenes/scrollable_list'
-  require 'app/scenes/menu_input'
-  require 'app/scenes/menu_controller'
-  require 'app/scenes/menu_renderer'
-  require 'app/scenes/menu_scene'
-  require 'app/scenes/title'
-  require 'app/scenes/settings'
-  require 'app/scenes/credits'
-  require 'app/scenes/instructions'
-  # Jukebox scene reuses the ProgressionTester UI verbatim.
-  require 'tools/progression_tester'
-end
+require 'app/game_settings'
+require 'app/highscores'
+require 'app/game'
+require 'app/scenes/scene_director'
+require 'app/scenes/scene_layout'
+require 'app/scenes/scrollable_list'
+require 'app/scenes/menu_input'
+require 'app/scenes/menu_controller'
+require 'app/scenes/menu_renderer'
+require 'app/scenes/menu_scene'
+require 'app/scenes/title'
+require 'app/scenes/settings'
+require 'app/scenes/credits'
+require 'app/scenes/instructions'
+# Jukebox scene reuses the ProgressionTester UI verbatim.
+require 'tools/progression_tester'
 
 def boot(_args)
   begin
@@ -45,11 +37,6 @@ def boot(_args)
 end
 
 def tick(args)
-  if PROGRESSION_TESTER_MODE
-    ProgressionTester.tick(args)
-    return
-  end
-
   $title ||= Scenes::Title.new
 
   # Apply pending scene swap at the apex of the fade-out (see ADR-0012).

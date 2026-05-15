@@ -2,19 +2,9 @@
 # progression_tester.rb
 # DJ Maze Game — Stem Gain Progression Dev Tool
 #
-# A standalone DragonRuby scene that lets you scrub each track's dot-collection
+# A jukebox scene that lets you scrub each track's dot-collection
 # completion % in real time and hear the stem gain progression respond immediately.
-# Run this instead of main.rb during audio tuning.
-#
-# HOW TO USE
-# ----------
-# 1. Drop this file alongside audio_manager.rb in your app/ folder.
-# 2. In main.rb, swap your tick to:
-#      require 'app/audio/manager.rb'   # plus the rest of app/audio/*.rb
-#      require 'app/progression_tester.rb'
-#      def tick(args) = ProgressionTester.tick(args)
-# 3. Use mouse to drag channel sliders or click the shortcut buttons.
-# 4. Edit TRACK_CONFIGS in track_config.rb, hot-reload fires instantly.
+# Reach it from the title menu during audio tuning.
 #
 # CONTROLS
 # --------
@@ -25,7 +15,7 @@
 #   [1][2][3][4]       — solo that track (mute others)
 #   [S]                — clear solo (all tracks audible)
 #   [R]                — reset AudioManager
-#   [Q] / Escape       — quit tester (return to main game if integrated)
+#   [Q] / Escape       — return to title
 # =============================================================================
 
 require 'app/audio/music_theory.rb'
@@ -106,8 +96,7 @@ module ProgressionTester
   # Entry point
   # ---------------------------------------------------------------------------
   # SFX side panel — clickable list to audition every SFX_DEFINITIONS entry.
-  # Reachable from the title via the :jukebox scene; also runs standalone via
-  # ./run_progression_tester (tools mode).
+  # Reachable from the title via the :jukebox scene.
   SFX_PANEL_X = 1060
   SFX_PANEL_Y_TOP = 620
   SFX_ROW_H = 30
@@ -155,13 +144,7 @@ module ProgressionTester
     kb = args.inputs.keyboard.key_down
     return unless kb.escape || kb.q
 
-    # mruby parses `defined?` as a method call, not a keyword, so use
-    # const_defined? to probe whether the main app stack is loaded.
-    if Object.const_defined?(:SceneDirector)
-      SceneDirector.request(:title)
-    else
-      $gtk.request_quit
-    end
+    SceneDirector.request(:title)
   end
 
   TOOL_VERSION = 3   # bump to force re-init on hot reload
