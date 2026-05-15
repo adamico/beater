@@ -25,7 +25,6 @@
 - rhythm hint in ghost sprites (pulse, glow)
 - ghosts animated sprites (idle, move, frightened, eaten)
 - proper level graphics in place of bland white walls
-- proper dot sprites in place of simple squares (musical theme related, still 4 colors)
 - shaders
 - particles
 
