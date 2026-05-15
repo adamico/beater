@@ -128,7 +128,12 @@ module GhostControllers
     end
 
     def next_direction(world, ghost)
-      target = (ghost.state == :scatter ? @scatter_target_fn : @chase_target_fn).call(world, ghost)
+      # G6 Enrage: any non-:off enrage_step suppresses scatter — the ghost keeps
+      # chasing Pac through scatter periods. Replaces Blinky's old Cruise Elroy
+      # special case; now applies uniformly to all four ghosts.
+      scatter_active = ghost.state == :scatter && ghost.enrage_step == :off
+      fn = scatter_active ? @scatter_target_fn : @chase_target_fn
+      target = fn.call(world, ghost)
       Targeting.next_direction(ghost, world, target)
     end
   end
@@ -144,10 +149,7 @@ module GhostControllers
 
   def self.blinky
     BaseChase.new(
-      scatter_target_fn: ->(world, ghost) {
-        # Cruise Elroy: when active, Blinky targets Pac during scatter too.
-        ghost.elroy_state != :off ? world.player.grid_cell(world.projection) : ghost.scatter_target
-      },
+      scatter_target_fn: ->(_w, ghost) { ghost.scatter_target },
       chase_target_fn:   ->(world, _g) { world.player.grid_cell(world.projection) }
     )
   end

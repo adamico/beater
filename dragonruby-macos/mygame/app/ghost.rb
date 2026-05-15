@@ -19,7 +19,8 @@ class Ghost
     eaten: "sprites/hexagon/white.png"
   }.freeze
 
-  attr_accessor :controller, :elroy_state, :eaten_flash_ticks
+  attr_accessor :controller, :eaten_flash_ticks
+  attr_reader   :enrage_step, :absorbed_hits, :armor_flash_ticks
   attr_reader :state, :identity, :scatter_target, :spawn_cell
 
   def state=(new_state)
@@ -43,10 +44,36 @@ class Ghost
     # Default: center the scaled sprite over the 1-cell logical rect.
     @sprite_offset_x = sprite_offset_x || (w * @sprite_scale - w) / 2.0
     @sprite_offset_y = sprite_offset_y || (h * @sprite_scale - h) / 2.0
-    @elroy_state = :off
+    @enrage_step = :off
+    @absorbed_hits = 0
+    @armor_flash_ticks = 0
     @stuck_ticks = 0
     @stuck_logged = false
     @eaten_flash_ticks = 0
+  end
+
+  # ADR-0011: partial bullet damage clears on every enrage step-up. The ghost
+  # "scars over" — partials don't accumulate across thresholds, and step-up
+  # can never make a ghost easier to kill in absolute terms.
+  def enrage_step=(new_step)
+    @absorbed_hits = 0 if new_step != @enrage_step
+    @enrage_step = new_step
+  end
+
+  ARMOR_FLASH_TICKS = 8 # short pulse on partial / absorbed bullet hit
+  ARMOR_FLASH_SCALE_BUMP = 0.20
+
+  def armor_flash!
+    @armor_flash_ticks = ARMOR_FLASH_TICKS
+  end
+
+  def absorb_bullet!
+    @absorbed_hits += 1
+    armor_flash!
+  end
+
+  def reset_absorbed!
+    @absorbed_hits = 0
   end
 
   # TG2 eaten-hit animation: identity sprite scales up to peak, then down to a
@@ -68,6 +95,13 @@ class Ghost
   # 2x = arcade 2x2 quad), centered via sprite_offset_x/y. Tweak via init args.
   def flashing?
     @eaten_flash_ticks && @eaten_flash_ticks > 0
+  end
+
+  # G6 Pacify: a despawned ghost has been permanently removed for the rest
+  # of the level by clearing its `Territory`. Skipped by tick / collision /
+  # render / phase-apply / release-schedule.
+  def despawned?
+    @state == :despawned
   end
 
   def to_sprite
@@ -92,6 +126,13 @@ class Ghost
     else
       path = @state == :eaten ? SPRITES[:eaten] : SPRITES[@identity]
       scale = @sprite_scale
+      if @armor_flash_ticks > 0
+        # ADR-0011 partial / immune bullet hit: brief scale pulse, no state
+        # change. Eases out so the kick is on impact, settles fast.
+        t = @armor_flash_ticks.to_f / ARMOR_FLASH_TICKS
+        scale *= 1.0 + ARMOR_FLASH_SCALE_BUMP * t
+        @armor_flash_ticks -= 1
+      end
     end
     off_x = (@w * scale - @w) / 2.0
     off_y = (@h * scale - @h) / 2.0

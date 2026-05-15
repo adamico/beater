@@ -23,6 +23,13 @@ class ReleaseSchedule
     @released[id]
   end
 
+  # G6: a Pacified (despawned) ghost must be marked released so the schedule
+  # never tries to release it.
+  def mark_released(id)
+    @released[id] = true
+    @ticks_since_release = 0
+  end
+
   def on_dot_eaten
     @dot_count += 1
     @ticks_since_release = 0

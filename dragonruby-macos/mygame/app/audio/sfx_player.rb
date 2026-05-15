@@ -36,6 +36,18 @@ module Audio
             .first(dur).map { |s| s * 0.5 }
         end
       },
+      # ADR-0011: partial bullet hit on enraged ghost — short metallic clank.
+      bullet_absorbed: -> {
+        dur = (SR / 60.0 * 4).ceil
+        WaveGenerator.tile_to_frame(WaveGenerator.square_period(220, duty: 0.5))
+          .first(dur).map.with_index { |s, i| s * 0.6 * (1.0 - i.to_f / dur) }
+      },
+      # ADR-0011: bullet against immune (:enrage2) ghost — deeper, harsher.
+      bullet_immune: -> {
+        dur = (SR / 60.0 * 6).ceil
+        WaveGenerator.tile_to_frame(WaveGenerator.square_period(110, duty: 0.5))
+          .first(dur).map.with_index { |s, i| s * 0.7 * (1.0 - i.to_f / dur) }
+      },
     }.freeze
 
     def self.play(args, sfx_name)

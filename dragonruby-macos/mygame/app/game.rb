@@ -1,25 +1,26 @@
-require 'app/tiles.rb'
-require 'app/grid_projection.rb'
-require 'app/camera.rb'
-require 'app/maze.rb'
-require 'app/pellets.rb'
-require 'app/direction.rb'
-require 'app/grid_mover.rb'
-require 'app/keyboard_controller.rb'
-require 'app/player.rb'
-require 'app/ghost.rb'
-require 'app/ghost_controllers.rb'
-require 'app/world.rb'
-require 'app/renderer.rb'
-require 'app/audio/beat_clock.rb'
-require 'app/level_config.rb'
-require 'app/phase_scheduler.rb'
-require 'app/release_schedule.rb'
-require 'app/ghost_state_machine.rb'
-require 'app/cruise_elroy.rb'
-require 'app/eat_sequencer.rb'
-require 'app/projectile.rb'
-require 'data/maps/pacman_layout.rb'
+require 'app/tiles'
+require 'app/grid_projection'
+require 'app/camera'
+require 'app/maze'
+require 'app/pellets'
+require 'app/direction'
+require 'app/grid_mover'
+require 'app/keyboard_controller'
+require 'app/player'
+require 'app/ghost'
+require 'app/ghost_controllers'
+require 'app/world'
+require 'app/renderer'
+require 'app/audio/beat_clock'
+require 'app/level_config'
+require 'app/phase_scheduler'
+require 'app/release_schedule'
+require 'app/ghost_state_machine'
+require 'app/territory'
+require 'app/enrage'
+require 'app/eat_sequencer'
+require 'app/projectile'
+require 'data/maps/pacman_layout'
 
 class Game
   attr_dr
@@ -57,9 +58,9 @@ class Game
 
   SPAWN_MARKER_TO_IDENTITY = {
     Tiles::SPAWN_BLINKY => :blinky,
-    Tiles::SPAWN_PINKY  => :pinky,
-    Tiles::SPAWN_INKY   => :inky,
-    Tiles::SPAWN_CLYDE  => :clyde
+    Tiles::SPAWN_PINKY => :pinky,
+    Tiles::SPAWN_INKY => :inky,
+    Tiles::SPAWN_CLYDE => :clyde
   }.freeze
 
   def initialize
@@ -132,9 +133,8 @@ class Game
     @maze.each_cell do |gx, gy, ch|
       id = SPAWN_MARKER_TO_IDENTITY[ch]
       next unless id
-      if cells[id].nil? || gx < cells[id][0]
-        cells[id] = [gx, gy]
-      end
+
+      cells[id] = [gx, gy] if cells[id].nil? || gx < cells[id][0]
     end
     cells
   end
@@ -146,10 +146,10 @@ class Game
     # on-map targets they oscillate between the two corridor intersections
     # adjacent to the corner cell instead of taking the vertical path.
     scatter_targets = {
-      blinky: [bounds[:gx1],     bounds[:gy1] + 3],
-      pinky:  [bounds[:gx0],     bounds[:gy1] + 3],
-      inky:   [bounds[:gx1],     bounds[:gy0] - 3],
-      clyde:  [bounds[:gx0],     bounds[:gy0] - 3]
+      blinky: [bounds[:gx1], bounds[:gy1] + 3],
+      pinky: [bounds[:gx0], bounds[:gy1] + 3],
+      inky: [bounds[:gx1], bounds[:gy0] - 3],
+      clyde: [bounds[:gx0], bounds[:gy0] - 3]
     }
 
     @ghosts = Ghost::IDENTITIES.map do |id|
@@ -171,7 +171,12 @@ class Game
 
   def reset_ghost_states
     @release_schedule.reset
+    # Pre-mark despawned ghosts as already released so the schedule never
+    # tries to spawn them out of the house (G6 Pacify persists through death).
+    @ghosts.each { |g| @release_schedule.mark_released(g.identity) if g.despawned? }
     @ghosts.each do |g|
+      next if g.despawned? # G6: pacified ghosts stay gone across death
+
       GhostControllers::Targeting.clear_latch(g.identity)
       if g.identity == :blinky
         g.state = @phase_scheduler.current_mode
@@ -235,7 +240,7 @@ class Game
     @eat_sequencer.tick(args)
     tick_track_fx
     if @eat_sequencer.frozen?
-      visible_ghosts = @ghosts.reject { |g| g.state == :eaten && !g.flashing? }
+      visible_ghosts = @ghosts.reject { |g| g.despawned? || (g.state == :eaten && !g.flashing?) }
       update_camera
       draw_frame(ghosts: visible_ghosts)
       return
@@ -362,6 +367,8 @@ class Game
   def respawn_actors
     reset_player_to_spawn
     @ghosts.each do |g|
+      next if g.despawned? # G6: pacified ghosts have no body to teleport
+
       cell = @spawn_cells[g.identity]
       rect = @projection.cell_rect(*cell)
       g.x = rect[:x]
@@ -379,7 +386,7 @@ class Game
     args.state.audio.on_respawn(args, ramp_out: @camera.dying_ease_duration)
   end
 
-  def draw_frame(ghosts: @ghosts)
+  def draw_frame(ghosts: @ghosts.reject(&:despawned?))
     @renderer.draw(
       outputs, @maze, @pellets, @player, ghosts,
       camera: @camera,
@@ -411,7 +418,7 @@ class Game
   end
 
   def apply_phase_to_ghosts(mode)
-    @ghosts.each { |g| @ghost_fsm.apply_phase(g, mode) }
+    @ghosts.each { |g| @ghost_fsm.apply_phase(g, mode) unless g.despawned? }
   end
 
   def tick_releases
@@ -463,6 +470,23 @@ class Game
     }
     @meter_flash[color] = METER_FLASH_TICKS
     args.state.audio.on_track_complete(args)
+    pacify_owner_of(color)
+  end
+
+  # G6 Pacify: clearing a Territory permanently despawns its owner ghost.
+  # Marks released so the schedule never re-spawns it, drops the controller,
+  # and sets state = :despawned (the filter every hot loop checks via
+  # despawned?). Persists across player death — clearance is monotonic.
+  def pacify_owner_of(color)
+    id = Territory.owner_of(color)
+    return unless id
+
+    ghost = @ghosts.find { |g| g.identity == id }
+    return unless ghost && !ghost.despawned?
+
+    ghost.state = :despawned
+    ghost.controller = nil
+    @release_schedule.mark_released(id)
   end
 
   # Advance Game-owned G1 timers: track popups (float + fade) and meter flash.
@@ -483,6 +507,7 @@ class Game
     return unless @player.controller.fire_pressed?(world)
     return if @player.direction.none?
     return unless @player.consume_ammo!
+
     fire_projectile
   end
 
@@ -504,13 +529,35 @@ class Game
   def resolve_projectile_hits
     @projectiles.each do |p|
       next if p.dead?
+
       @ghosts.each do |g|
-        next if g.state == :in_house || g.state == :eaten
+        next if g.despawned? || g.state == :in_house || g.state == :eaten
         next unless rects_overlap?(p.rect, g.rect)
-        eat_ghost(g)
-        p.kill!
+
+        apply_bullet_to(g)
+        p.kill! # ADR-0011: bullets are always consumed on contact
         break
       end
+    end
+  end
+
+  # ADR-0011: bullet resistance gated by Enrage step. :off needs 1 hit (kill),
+  # :enrage1 needs 2 (1st partial → flash + metallic clank, 2nd kills),
+  # :enrage2 is immune (every hit flashes + plays the heavier metallic SFX,
+  # never kills). Bullet always consumed by the caller.
+  def apply_bullet_to(g)
+    if g.enrage_step == :enrage2
+      g.armor_flash!
+      args.state.audio.on_bullet_immune(args)
+      return
+    end
+
+    g.absorb_bullet!
+    if g.absorbed_hits >= Enrage.hits_required(g.enrage_step)
+      g.reset_absorbed!
+      eat_ghost(g)
+    else
+      args.state.audio.on_bullet_absorbed(args)
     end
   end
 
@@ -518,7 +565,7 @@ class Game
     debug = args&.state&.debug_ghost
     apply_dynamic_speeds
     @ghosts.each do |g|
-      next if g.state == :in_house
+      next if g.despawned? || g.state == :in_house
 
       @ghost_fsm.tick_transitions(g, debug: debug)
       next unless g.controller
@@ -528,41 +575,47 @@ class Game
     end
   end
 
+  # G6: per-Territory Enrage applied to every ghost. Replaces global
+  # Cruise Elroy. Each ghost's enrage_step is derived from how many dots
+  # remain in *its* Territory (the quadrant it owns by scatter corner).
   def apply_dynamic_speeds
-    clyde = @ghosts.find { |g| g.identity == :clyde }
-    clyde_in_house = clyde && clyde.state == :in_house
-    elroy = CruiseElroy.state(
-      @pellets.remaining,
-      clyde_in_house: clyde_in_house,
-      elroy1_dots: @level_config[:elroy1_dots],
-      elroy2_dots: @level_config[:elroy2_dots]
-    )
     @ghosts.each do |g|
-      next if g.state == :in_house || g.state == :leaving_house
+      next if g.despawned? || g.state == :in_house || g.state == :leaving_house
 
-      g.elroy_state = (g.identity == :blinky ? elroy : :off)
+      g.enrage_step = enrage_for(g)
 
       next if g.state == :eaten # eaten ghosts ignore tunnel slowdown
+
       g.speed = effective_ghost_speed(g)
     end
+  end
+
+  def enrage_for(g)
+    color = Territory.color_of(g.identity)
+    remaining = @pellets.remaining_by_color[color]
+    Enrage.step(
+      remaining,
+      enrage1_dots: @level_config[:enrage1_dots],
+      enrage2_dots: @level_config[:enrage2_dots]
+    )
   end
 
   def effective_ghost_speed(g)
     gx, gy = g.grid_cell(@projection)
     return PLAYER_SPEED * @level_config[:ghost_tunnel_ratio] if @maze.tunnel?(gx, gy)
-    if g.identity == :blinky
-      case g.elroy_state
-      when :elroy2 then return PLAYER_SPEED * @level_config[:elroy2_ratio]
-      when :elroy1 then return PLAYER_SPEED * @level_config[:elroy1_ratio]
-      end
+
+    case g.enrage_step
+    when :enrage2 then return PLAYER_SPEED * @level_config[:enrage2_ratio]
+    when :enrage1 then return PLAYER_SPEED * @level_config[:enrage1_ratio]
     end
     g.base_speed
   end
 
   def tick_collisions
     @ghosts.each do |g|
-      next if g.state == :in_house || g.state == :eaten
+      next if g.despawned? || g.state == :in_house || g.state == :eaten
       next unless rects_overlap?(@player.rect, g.rect)
+
       enter_dying
       return
     end
@@ -586,6 +639,7 @@ class Game
 
     @pellets.each_with_color do |_pos, kind, color|
       next unless kind == :pellet
+
       track = Audio::Manager::DOT_COLORS[color]
       totals[track] += 1 if track
     end

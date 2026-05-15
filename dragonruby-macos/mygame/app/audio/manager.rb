@@ -80,6 +80,16 @@ module Audio
       SFXPlayer.play(args, :enemy_eaten)
     end
 
+    # ADR-0011: bullet partially absorbed by an :enrage1 ghost.
+    def on_bullet_absorbed(args)
+      SFXPlayer.play(args, :bullet_absorbed)
+    end
+
+    # ADR-0011: bullet hit an immune (:enrage2) ghost — never kills.
+    def on_bullet_immune(args)
+      SFXPlayer.play(args, :bullet_immune)
+    end
+
     # Music ducks out on player death (Dying phase 1). Eased via ramp_in.
     DEATH_DUCK_GAIN_SCALE = 0.12
     DEATH_DUCK_RAMP_IN    = 18

@@ -15,7 +15,7 @@ class LatchDummyGhost
   def grid_cell(projection); [@x, @y]; end
   def speed; 1.0; end
   def state; :scatter; end
-  def elroy_state; :off; end
+  def enrage_step; :off; end
 end
 
 def make_latch_world(layout)
