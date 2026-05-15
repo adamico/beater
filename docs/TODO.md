@@ -15,6 +15,9 @@
 - UI4: Pause menu (resume, settings, exit to title)
 - UI5: Improve Game Over screen with highscore table & time taken
 
+## tests & dev
+- reenable DRGTK console shortcuts
+
 # Polish after MVP
 
 ## Visual

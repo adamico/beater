@@ -2,6 +2,11 @@
 cd "`dirname "$0"`"
 cd dragonruby-macos
 
+# Run tests headless: SDL's dummy video driver skips Metal/Cocoa entirely, so
+# no window pops up. Renderer drops to software at 1024x576 — fine for tests
+# that don't assert on rendered pixels (all of ours).
+export SDL_VIDEODRIVER=dummy
+
 status=0
 for file in mygame/tests/*_tests.rb; do
   echo "=== $file ==="
