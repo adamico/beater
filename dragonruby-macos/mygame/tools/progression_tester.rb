@@ -171,9 +171,14 @@ module ProgressionTester
   # ---------------------------------------------------------------------------
   def self.init(args)
     args.state.pt_version    = TOOL_VERSION
-    args.state.pt_completion = { drums: 0.0, bass: 0.0, lead: 0.0, chords: 0.0 }
+    # Jukebox UX: start at full progression so unmuting/soloing instantly
+    # reveals the evolved mix. Pull sliders down to audition the closed-
+    # filter / low-gain starting state.
+    args.state.pt_completion = { drums: 1.0, bass: 1.0, lead: 1.0, chords: 1.0 }
     args.state.pt_solo       = nil          # nil = no solo, else track symbol
-    args.state.pt_muted      = { drums: false, bass: false, lead: false, chords: false }
+    # TT3: tracks start muted so the jukebox opens silent — unmute or solo
+    # to audition each stem on demand.
+    args.state.pt_muted      = { drums: true, bass: true, lead: true, chords: true }
     args.state.pt_gain_override = { drums: 1.0, bass: 1.0, lead: 1.0, chords: 1.0 }
     args.state.pt_dragging   = nil          # track being dragged
     args.state.pt_drag_start = nil          # [mouse_y, completion_at_start]
@@ -238,8 +243,11 @@ module ProgressionTester
     # --- Mouse: fader drag ---
     mouse = args.inputs.mouse
 
-    if mouse.button_left && mouse.down
-      # Check if clicking on per-track mute buttons
+    # TT1 / TT2: mute and solo buttons need edge-triggered clicks. The old
+    # `button_left && mouse.down` is true every frame the button is held,
+    # so the toggle flipped up to 60x per click → random final state.
+    # mouse.click is set only on the frame the click is registered.
+    if mouse.click
       TRACK_ORDER.each_with_index do |track, i|
         mute_rect = mute_btn_rect(i)
         if point_in_rect?(mx, my, mute_rect)
@@ -248,8 +256,18 @@ module ProgressionTester
           post_message(args, "#{TRACK_NAMES[track]} #{state}")
           return
         end
-      end
 
+        solo_rect = solo_btn_rect(i)
+        next unless point_in_rect?(mx, my, solo_rect)
+
+        args.state.pt_solo = (args.state.pt_solo == track ? nil : track)
+        msg = args.state.pt_solo ? "SOLO: #{TRACK_NAMES[track]}" : 'SOLO CLEARED'
+        post_message(args, msg)
+        return
+      end
+    end
+
+    if mouse.button_left && mouse.down
       # Check if clicking on a fader thumb
       TRACK_ORDER.each_with_index do |track, i|
         thumb_rect = fader_thumb_rect(args, track, i)
@@ -282,14 +300,14 @@ module ProgressionTester
     end
 
     # --- Mouse: global buttons ---
+    # Edge-triggered too — RESET in particular re-creates Audio::Manager
+    # so firing it every frame would be catastrophic if a user lingered.
     args.state.pt_btn_hot = nil
     global_buttons(args).each do |btn|
-      if point_in_rect?(mx, my, btn[:rect])
-        args.state.pt_btn_hot = btn[:id]
-        if mouse.button_left && mouse.down
-          btn[:action].call
-        end
-      end
+      next unless point_in_rect?(mx, my, btn[:rect])
+
+      args.state.pt_btn_hot = btn[:id]
+      btn[:action].call if mouse.click
     end
   end
 
@@ -325,15 +343,20 @@ module ProgressionTester
 
     audio.tick(args)
 
-    # Apply mute/solo overrides AFTER sync_gains, so the zero gain sticks for
-    # the frame. The override is re-applied every tick because sync_gains
-    # otherwise restores the progression-derived gain.
+    # Apply mute/solo via the `paused` flag, not by zeroing gain. With the
+    # native audio backend (audio_stem_fx.dylib) the gain we'd write into
+    # args.audio[key].gain is ignored — gain is pushed through
+    # NativeBridge.push_track_params from sync_gains every tick. Pausing
+    # is engine-level and respected by both legacy and native backends.
     TRACK_ORDER.each do |track|
       key = :"track_#{track}"
       next unless args.audio[key]
 
-      silenced = muted[track] || (solo && solo != track)
-      args.audio[key].gain = 0.0 if silenced
+      # DAW convention: solo overrides mute on the soloed track. While
+      # any track is soloed, only that one plays — mute state on the
+      # soloed track is ignored. Otherwise per-track mute decides.
+      silenced = solo ? (solo != track) : muted[track]
+      args.audio[key].paused = silenced
     end
 
     # Decay meter values toward current completion (VU meter feel)

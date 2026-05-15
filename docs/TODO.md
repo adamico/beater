@@ -2,7 +2,7 @@
 
 ## Bugs & Tweaks
 
-- at gameover screen, when choosing to go back to title with the keyboard, the game tries to restart and then goes back to title
+- BT1: when the hotloaded tests are added to the list, it causes a game reset. this causes issues, for example when choosing to go back to title with the keyboard, the game tries to restart and then goes back to title
 
 ## Visuals
 
@@ -13,11 +13,7 @@
 ## UI
 
 ## tests & tools
-- reenable DRGTK console shortcuts
-- jukebox mute only mutes, when clicked again it doesn't unmute
-- jukebox solo doesn't work
-- jukebox tracks should be muted by default
-  
+
 # Polish after MVP
 
 ## Visual

@@ -13,26 +13,46 @@ module Audio
     SFX_DEFINITIONS = {
       enemy_eaten: {
         gain: 0.3,
+        # Mirrors the ghost's eaten flash: scale up to 1.6× over 8 ticks
+        # (ease-out grow), then down to 0.1× over 16 ticks (ease-in shrink).
+        # Pitch follows the same shape — a quick "POP" upward then a
+        # rapid "suck-away" downward. ~400ms total to match
+        # Ghost::EATEN_FLASH_TICKS at 60fps.
         samples: lambda {
-          wave = :saw
-          freqs = [NOTE[:a5], NOTE[:g5], NOTE[:f5], NOTE[:ds5],
-                   NOTE[:c5], NOTE[:a4], NOTE[:g4], NOTE[:f4]]
-          dur  = (SR / 60.0 * 3).ceil # ~50ms per note → ~400ms total
-          ramp = 300                  # ~6ms half-cosine A/R
-          half_pi = Math::PI / 2.0
-          freqs.each_with_index.flat_map do |freq, idx|
-            tail = 1.0 - idx.to_f / (freqs.length * 2)
-            Array.new(dur) do |i|
-              s = WaveGenerator.osc(wave, freq, i)
-              env = if i < ramp
-                      Math.sin(half_pi * i / ramp)**2
-                    elsif i > dur - ramp
-                      Math.sin(half_pi * (dur - i) / ramp)**2
-                    else
-                      1.0
-                    end
-              s * env * tail
+          dur = (SR / 60.0 * 24).ceil # 400ms = EATEN_FLASH_TICKS
+          grow_t_end = 8.0 / 24.0     # 33% — peak of the visual scale
+          f_low  = 280.0   # before the pop
+          f_peak = 1400.0  # at scale-peak
+          f_tail = 90.0    # after the shrink — vanishing rumble
+          attack = (SR * 0.002).to_i
+          two_pi_over_sr = WaveGenerator::TWO_PI / SR
+          carrier_phase = 0.0
+          Array.new(dur) do |i|
+            t = i.to_f / dur
+            # Match the visual easing curves exactly:
+            #  - Phase A (grow): ease-out 1 - (1-u)² takes pitch low → peak
+            #  - Phase B (shrink): ease-in u² takes pitch peak → tail
+            if t < grow_t_end
+              u = t / grow_t_end
+              eased = 1.0 - (1.0 - u) * (1.0 - u)
+              freq = f_low + (f_peak - f_low) * eased
+            else
+              u = (t - grow_t_end) / (1.0 - grow_t_end)
+              eased = u * u
+              freq = f_peak + (f_tail - f_peak) * eased
             end
+
+            carrier_phase += two_pi_over_sr * freq
+
+            # Saw wave from accumulated phase — bright, has the bite to
+            # read as "consumed" without being harsh.
+            p = carrier_phase / WaveGenerator::TWO_PI
+            p -= p.floor
+            tone = 2.0 * p - 1.0
+
+            env_attack = i < attack ? i.to_f / attack : 1.0
+            env_decay  = (1.0 - t)**1.1
+            tone * env_attack * env_decay
           end
         }
       },
@@ -231,35 +251,56 @@ module Audio
           end
         }
       },
-      # Player death — sub-bass impact click pre-layer + synth detune crash.
-      # First ~80ms gets a low 60Hz punch for oomph; the existing detune sweep
-      # continues over the full duration. Sits under the music duck.
+      # Player death — "spinning down": descending pitch glissando with a
+      # vibrato (pitch wobble) on top, both whose rate slows from a fast
+      # flutter to a long wobble. Matches the visual (rapid rotation +
+      # shrinking scale) — the pitch drop reads as the scale collapse,
+      # the vibrato as the rotation winding down.
+      #
+      # Both the carrier pitch and the vibrato rate sweep over the SFX
+      # lifetime, so phase has to be integrated sample-by-sample (no
+      # closed form once an LFO modulates the carrier frequency).
       player_death: {
         gain: 0.5,
         samples: lambda {
-          crash_wave = :sine
-          punch_wave = :sine
-          dur = (SR / 60.0 * 22).ceil # ~0.37s
-          f1 = 220.0
-          detune_start = 6.0
-          detune_end   = 48.0
-          punch_dur = (SR * 0.08).to_i # ~80ms sub-bass click
-          punch_attack = (SR * 0.002).to_i # 2ms sharp click attack
+          dur = (SR / 60.0 * 28).ceil # ~470ms — matches the death anim
+          f_start = 520.0  # high pitch as rotation begins
+          f_end   = 70.0   # near-rumble as it vanishes
+          # Vibrato: 14Hz at the start reads as a frantic warble; 2Hz at
+          # the tail is a slow last wobble. Depth 0.18 ≈ ±18% pitch swing
+          # (roughly ±3 semitones) — wide enough to read as a spin, not
+          # so wide it dissolves the pitch identity.
+          lfo_start = 14.0
+          lfo_end   = 2.0
+          vibrato_depth = 0.18
+          attack = (SR * 0.005).to_i
+          delta_f   = f_end - f_start
+          delta_lfo = lfo_end - lfo_start
+          two_pi_over_sr = WaveGenerator::TWO_PI / SR
+          carrier_phase = 0.0
+          lfo_phase = 0.0
           Array.new(dur) do |i|
-            t   = i.to_f / dur
-            f2  = f1 + detune_start + (detune_end - detune_start) * t
-            env = (1.0 - t)**1.6
-            crash = (WaveGenerator.osc(crash_wave, f1, i) +
-                     WaveGenerator.osc(crash_wave, f2, i)) * 0.5 * env
-            if i < punch_dur
-              punch_env = if i < punch_attack then i.to_f / punch_attack
-                          else (1.0 - (i - punch_attack).to_f / (punch_dur - punch_attack))**2.0
-                          end
-              punch = WaveGenerator.osc(punch_wave, 60.0, i) * 0.9 * punch_env
-              crash + punch
-            else
-              crash
-            end
+            t = i.to_f / dur
+
+            f_carrier = f_start + delta_f * t
+            lfo_rate  = lfo_start + delta_lfo * t
+
+            # Vibrato modulates the *instantaneous* carrier frequency,
+            # then we integrate to get phase. Per-sample accumulation
+            # because there's no closed form once the LFO sweeps too.
+            vibrato = vibrato_depth * Math.sin(lfo_phase)
+            inst_freq = f_carrier * (1.0 + vibrato)
+            carrier_phase += two_pi_over_sr * inst_freq
+            lfo_phase     += two_pi_over_sr * lfo_rate
+
+            # Triangle wave from accumulated phase.
+            p = carrier_phase / WaveGenerator::TWO_PI
+            p -= p.floor
+            tone = p < 0.5 ? 4.0 * p - 1.0 : 3.0 - 4.0 * p
+
+            env_attack = i < attack ? i.to_f / attack : 1.0
+            env_decay  = (1.0 - t)**1.3
+            tone * env_attack * env_decay * (1.0 - 0.4 * (0.5 - 0.5 * Math.cos(lfo_phase)))
           end
         }
       }
