@@ -21,6 +21,10 @@ require 'app/enrage'
 require 'app/eat_sequencer'
 require 'app/projectile'
 require 'data/maps/pacman_layout'
+require 'app/scenes/scene_director'
+require 'app/scenes/menu_input'
+require 'app/scenes/menu_controller'
+require 'app/scenes/menu_renderer'
 
 class Game
   attr_dr
@@ -220,10 +224,89 @@ class Game
     case @state
     when :ready          then tick_ready
     when :playing        then tick_playing
+    when :paused         then tick_paused
     when :dying          then tick_dying
     when :level_complete then tick_level_complete
     when :game_over      then tick_game_over
     end
+  end
+
+  PAUSE_ITEMS = %i[resume exit_to_title].freeze
+  PAUSE_LABELS = { resume: 'RESUME', exit_to_title: 'EXIT TO TITLE' }.freeze
+  PAUSE_ITEM_W = 320
+  PAUSE_ITEM_H = 52
+  PAUSE_ITEM_GAP = 14
+  PAUSE_ITEMS_TOP_Y = SceneDirector::SCREEN_H - 320
+
+  def enter_paused
+    @state = :paused
+    @pause_selected = 0
+  end
+
+  def exit_paused
+    @state = :playing
+  end
+
+  def tick_paused
+    handle_pause_input
+    draw_frame
+    draw_pause_overlay
+  end
+
+  def handle_pause_input
+    return if SceneDirector.transitioning?
+
+    if Scenes::MenuInput.pause?(args)
+      exit_paused
+      return
+    end
+
+    result = Scenes::MenuController.update(
+      args,
+      selected: @pause_selected,
+      count: PAUSE_ITEMS.length,
+      item_rects: pause_item_rects
+    )
+    @pause_selected = result[:selected]
+    activate_pause_item if result[:action] == :activate
+  end
+
+  def pause_item_rects
+    Scenes::MenuRenderer.item_rects(
+      PAUSE_ITEMS.length,
+      screen_w: SceneDirector::SCREEN_W,
+      top_y: PAUSE_ITEMS_TOP_Y,
+      item_w: PAUSE_ITEM_W,
+      item_h: PAUSE_ITEM_H,
+      gap: PAUSE_ITEM_GAP
+    )
+  end
+
+  def activate_pause_item
+    case PAUSE_ITEMS[@pause_selected]
+    when :resume        then exit_paused
+    when :exit_to_title then SceneDirector.request(:title)
+    end
+  end
+
+  def draw_pause_overlay
+    Scenes::MenuRenderer.draw_dim(
+      outputs,
+      w: SceneDirector::SCREEN_W,
+      h: SceneDirector::SCREEN_H
+    )
+    Scenes::MenuRenderer.draw_heading(
+      outputs, 'PAUSED',
+      x: SceneDirector::SCREEN_W / 2,
+      y: SceneDirector::SCREEN_H - 120
+    )
+    Scenes::MenuRenderer.draw_items(
+      outputs,
+      pause_item_rects,
+      PAUSE_ITEMS.map { |k| PAUSE_LABELS[k] },
+      @pause_selected,
+      label_size: 5
+    )
   end
 
   # --- Game state machine (see CONTEXT.md "Game state") --------------------
@@ -248,6 +331,12 @@ class Game
   end
 
   def tick_playing
+    if pause_pressed?
+      enter_paused
+      draw_frame
+      draw_pause_overlay
+      return
+    end
     @eat_sequencer.tick(args)
     tick_track_fx
     if @eat_sequencer.frozen?
@@ -417,6 +506,10 @@ class Game
       completion: @pellets.completion_by_color,
       meter_flash: @meter_flash
     }
+  end
+
+  def pause_pressed?
+    Scenes::MenuInput.pause?(args)
   end
 
   def any_key_pressed?

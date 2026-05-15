@@ -12,7 +12,6 @@
 
 - UI1: Title screen (with title, background, credits, social, play button)
 - UI2: Settings screen (graphics, accessibility, audio, controls)
-- UI3b add ghost-identity icon on each HUD enrage gauge.
 - UI4: Pause menu (resume, settings, exit to title)
 - UI5: Improve Game Over screen with highscore table & time taken
 
@@ -26,6 +25,9 @@
 - proper level graphics in place of bland white walls
 - shaders
 - particles
+
+## UI
+- UI3b add ghost-identity icon on each HUD enrage gauge.
 
 ## Audio
 
