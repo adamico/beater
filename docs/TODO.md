@@ -2,6 +2,8 @@
 
 ## Bugs & Tweaks
 
+- at gameover screen, when choosing to go back to title with the keyboard, the game tries to restart and then goes back to title
+
 ## Visuals
 
 ## Audio
@@ -10,27 +12,23 @@
 
 ## UI
 
-- UI1: Title screen (with title, background, credits, social, play button)
-- UI2: Settings screen (graphics, accessibility, audio, controls)
-- UI4: Pause menu (resume, settings, exit to title)
-- UI5: Improve Game Over screen with highscore table & time taken
-
-## tests & dev
+## tests & tools
 - reenable DRGTK console shortcuts
+- add a jukebox mode to listen to music and sfx without playing, for testing and fun
 
 # Polish after MVP
 
 ## Visual
-- add player trail
+- V1: ghosts animated sprites (idle, move, frightened, eaten)
+- add player ghost trail like vampire survivors
 - improve hit feedback (ghosts, player, dots)
 - rhythm hint in ghost sprites (pulse, glow)
-- ghosts animated sprites (idle, move, frightened, eaten)
 - proper level graphics in place of bland white walls
 - shaders
 - particles
 
 ## UI
-- UI3b add ghost-identity icon on each HUD enrage gauge.
+- UI3: (depends on V1) add ghost-identity icon on each HUD enrage gauge.
 
 ## Audio
 
@@ -40,7 +38,12 @@
 ## Gameplay
 
 - G5: bonus score collectables or other collectables?
-- 
+
+## tests & refactor
+
+- improve the maze layout code to be more data-driven and less hardcoded, maybe with a visual editor
+- add a level difficulty curve editor to tweak enemy behavior, spawn rates, and other parameters across levels
+
 # Future ideas
 
 ## Gameplay

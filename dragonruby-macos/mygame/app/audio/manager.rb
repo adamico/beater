@@ -100,6 +100,7 @@ module Audio
                      gain_scale: DEATH_DUCK_GAIN_SCALE,
                      ramp_in: DEATH_DUCK_RAMP_IN,
                      ramp_out: 8)
+      SFXPlayer.play(args, :player_death)
     end
 
     # Pause ducks the music to background level via the same envelope as

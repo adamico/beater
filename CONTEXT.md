@@ -26,7 +26,9 @@ Maze chase game with a rhythm hook. Diverges from OG Pac-Man where called out. A
 
 - **Track completion** — per-`Track` progress ratio: dots eaten of that color ÷ total dots of that color in the level. Dot-based only (not time/score). Drives the audio progression mix and the HUD's 4 track meters. Backed by a live remaining-by-color counter on `Pellets` (decremented on eat), not a rescan. Reaching 100% (the colour's last dot eaten) awards a flat **1000-point track-completion bonus** (G1), fired per-track the instant the count hits 0 — with a score popup at that dot's cell, a HUD meter flash, and an audio stinger. Unlike `Eat freeze` it does not freeze the world. The popup runs on a `Game`-owned path, not `EatSequencer`.
 
-- **HUD** — screen-space overlay. Shows score (run-long total), `Life` count as a row of player-sprite icons, the `HUD ammo row`, and 4 `Track completion` meters. Visible in `ready` / `playing` / `dying`; dimmed under a `Pause` overlay; replaced by the `Highscore table` screen in `game_over`.
+- **HUD** — screen-space overlay. Shows score (run-long total), `Life` count as a row of player-sprite icons, the `HUD ammo row`, 4 `Track completion` meters, and a small `Beat pulse` indicator. Visible in `ready` / `playing` / `dying`; dimmed under a `Pause` overlay; replaced by the `Highscore table` screen in `game_over`.
+
+- **Beat pulse** — small square HUD indicator centred above the `Track completion` meters that pops bright + large on each downbeat and decays to a dim minimum just before the next beat. Visually mirrors the `LEVEL_BPM` (128 BPM ⇒ 28.125 frames/beat). Driven by `args.tick_count` so it stays in phase across pause, identical to `BeatClock`'s tick-derived audio scheduling.
 
 - **Ready** — level-intro `Game state`, entered at level start only (not on respawn). Actors placed and frozen; a beat-synced count-in (≈1 bar at `LEVEL_BPM`) plays metronome clicks, no track. Automatic `ready → playing` at count-in end, no input gate.
 

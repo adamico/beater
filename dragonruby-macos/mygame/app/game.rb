@@ -440,16 +440,23 @@ class Game
       return
     end
     if Scenes::MenuInput.confirm?(args)
+      Audio::SFXPlayer.play(args, :ui_activate)
       commit_initials
       return
     end
 
     v = Scenes::MenuInput.navigate_delta(args)
-    # Up (-1) advances the letter (A→B); Down (+1) goes back.
-    @initials[@initials_slot] = (@initials[@initials_slot] - v) % 26 if v != 0
+    if v != 0
+      # Up (-1) advances the letter (A→B); Down (+1) goes back.
+      @initials[@initials_slot] = (@initials[@initials_slot] - v) % 26
+      Audio::SFXPlayer.play(args, :ui_navigate)
+    end
 
     h = Scenes::MenuInput.horizontal_delta(args)
-    @initials_slot = (@initials_slot + h) % 3 if h != 0
+    if h != 0
+      @initials_slot = (@initials_slot + h) % 3
+      Audio::SFXPlayer.play(args, :ui_navigate)
+    end
   end
 
   def commit_initials
@@ -694,11 +701,13 @@ class Game
   end
 
   def hud_data
+    beats = args.tick_count.to_f / FRAMES_PER_BEAT
     {
       score: @score,
       lives: @lives,
       completion: @pellets.completion_by_color,
-      meter_flash: @meter_flash
+      meter_flash: @meter_flash,
+      beat_phase: beats - beats.floor
     }
   end
 
@@ -818,6 +827,7 @@ class Game
     return if @player.direction.none?
     return unless @player.consume_ammo!
 
+    Audio::SFXPlayer.play(args, :shoot)
     fire_projectile
   end
 

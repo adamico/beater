@@ -62,6 +62,17 @@ class Renderer
   HUD_METER_BG     = { r: 55, g: 55, b: 55 }.freeze
   HUD_METER_COLORS = %i[red green blue yellow].freeze
 
+  # Beat pulse — a small square that pops bright+large on the downbeat and
+  # decays to a dim minimum just before the next beat. Centred above the
+  # track meters. Driven by hud[:beat_phase] (0..1 across one beat).
+  HUD_BEAT_X       = Camera::SCREEN_W / 2
+  HUD_BEAT_Y       = 684
+  HUD_BEAT_R_MIN   = 3
+  HUD_BEAT_R_MAX   = 9
+  HUD_BEAT_COLOR   = { r: 255, g: 230, b: 100 }.freeze
+  HUD_BEAT_ALPHA_MIN = 80
+  HUD_BEAT_ALPHA_MAX = 255
+
   def initialize(projection)
     @projection = projection
     @world_target_built = false
@@ -90,6 +101,18 @@ class Renderer
     }
     draw_hud_lives(outputs, hud[:lives])
     draw_hud_meters(outputs, hud[:completion], hud[:meter_flash])
+    draw_hud_beat_pulse(outputs, hud[:beat_phase]) if hud[:beat_phase]
+  end
+
+  def draw_hud_beat_pulse(outputs, phase)
+    intensity = 1.0 - phase.clamp(0.0, 1.0)
+    r = HUD_BEAT_R_MIN + (HUD_BEAT_R_MAX - HUD_BEAT_R_MIN) * intensity
+    alpha = (HUD_BEAT_ALPHA_MIN + (HUD_BEAT_ALPHA_MAX - HUD_BEAT_ALPHA_MIN) * intensity).to_i
+    outputs.solids << {
+      x: HUD_BEAT_X - r, y: HUD_BEAT_Y - r,
+      w: 2 * r, h: 2 * r,
+      **HUD_BEAT_COLOR, a: alpha
+    }
   end
 
   def draw_hud_lives(outputs, lives)

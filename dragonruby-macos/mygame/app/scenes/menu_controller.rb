@@ -1,4 +1,5 @@
 require 'app/scenes/menu_input'
+require 'app/audio/sfx_player'
 
 # Stateless menu-input reducer: takes the caller's current selection and the
 # item rects, returns the updated selection and an action symbol. Centralises
@@ -8,6 +9,7 @@ module Scenes
   module MenuController
     # @return [Hash] { selected:, action: :activate | :cancel | :none }
     def self.update(args, selected:, count:, item_rects:)
+      previous = selected
       delta = MenuInput.navigate_delta(args)
       kb_used = delta != 0
       selected = (selected + delta) % count if kb_used
@@ -17,11 +19,17 @@ module Scenes
       # prevents a stale cursor from yanking selection after a key press.
       selected = hover if hover && !kb_used && args.inputs.mouse.moved
 
+      Audio::SFXPlayer.play(args, :ui_navigate) if selected != previous
+
       if MenuInput.mouse_click?(args) && hover
+        Audio::SFXPlayer.play(args, :ui_activate)
         return { selected: hover, action: :activate }
       end
 
-      return { selected: selected, action: :activate } if MenuInput.confirm?(args)
+      if MenuInput.confirm?(args)
+        Audio::SFXPlayer.play(args, :ui_activate)
+        return { selected: selected, action: :activate }
+      end
       return { selected: selected, action: :cancel } if MenuInput.cancel?(args)
 
       { selected: selected, action: :none }
