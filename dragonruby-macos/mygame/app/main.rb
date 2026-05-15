@@ -7,7 +7,6 @@ require 'app/audio/native_bridge'
 require 'app/audio/track_player'
 require 'app/audio/sfx_player'
 require 'app/audio/manager'
-
 require 'app/game_settings'
 require 'app/highscores'
 require 'app/game'
@@ -22,8 +21,7 @@ require 'app/scenes/title'
 require 'app/scenes/settings'
 require 'app/scenes/credits'
 require 'app/scenes/instructions'
-# Jukebox scene reuses the ProgressionTester UI verbatim.
-require 'tools/progression_tester'
+require 'app/jukebox'
 
 def boot(_args)
   begin
