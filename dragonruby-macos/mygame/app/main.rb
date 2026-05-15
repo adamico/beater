@@ -104,9 +104,6 @@ def apply_scene_swap(args)
 end
 
 def reset(args)
-  $game = nil
-  Audio::NativeBridge.reset_runtime_state!
-  args.state.audio = nil
   args.state.request_game_reset = false
   SceneDirector.request(:title)
 end

@@ -453,15 +453,19 @@ class Game
     end
 
     h = Scenes::MenuInput.horizontal_delta(args)
-    if h != 0
-      @initials_slot = (@initials_slot + h) % 3
-      Audio::SFXPlayer.play(args, :ui_navigate)
-    end
+    return unless h != 0
+
+    @initials_slot = (@initials_slot + h) % 3
+    Audio::SFXPlayer.play(args, :ui_navigate)
   end
 
   def commit_initials
     letters = @initials.map { |i| ('A'.ord + i).chr }.join
-    date = (Time.now.strftime('%Y-%m-%d') rescue '----')
+    date = begin
+      Time.now.strftime('%Y-%m-%d')
+    rescue StandardError
+      '----'
+    end
     @final_rank = Highscores.insert(
       score: @score, level_reached: @level,
       time_seconds: @play_ticks / 60, initials: letters, date: date
@@ -497,7 +501,7 @@ class Game
     Scenes::MenuRenderer.item_rects(
       GAME_OVER_ITEMS.length,
       screen_w: Scenes::SceneLayout::SCREEN_W,
-      top_y: GAME_OVER_MENU_TOP_Y,
+      top_y: GAME_OVER_MENU_TOP_Y - 50,
       item_w: GAME_OVER_ITEM_W,
       item_h: GAME_OVER_ITEM_H,
       gap: GAME_OVER_ITEM_GAP
