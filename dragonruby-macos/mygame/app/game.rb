@@ -439,24 +439,30 @@ class Game
     player_eat_pellets
   end
 
+  # G4a: dot is eaten only when the player's center enters its cell, not when
+  # the player rect bleeds 1px into the cell. Matches OG Pac feel and removes
+  # the duplicate-eat edge case where rect overlap touched two cells at once.
   def player_eat_pellets
-    @projection.cells_touched(@player.rect).each do |gx, gy|
-      entry = @pellets.eat(gx, gy)
-      next unless entry
+    cs = @projection.cell_size
+    cx = @player.x + @player.w / 2.0
+    cy = @player.y + @player.h / 2.0
+    gx = (cx / cs).floor
+    gy = (cy / cs).floor
+    entry = @pellets.eat(gx, gy)
+    return unless entry
 
-      kind = entry[:kind]
-      @release_schedule.on_dot_eaten
-      @player.on_dot_eaten
-      @score += (kind == :power ? 50 : 10)
-      if kind == :power
-        args.state.audio.on_power_pellet(args)
-        @player.gain_ammo
-      else
-        args.state.audio.on_dot_collected(args, entry[:color])
-      end
-
-      on_track_cleared(gx, gy, entry[:track_cleared]) if entry[:track_cleared]
+    kind = entry[:kind]
+    @release_schedule.on_dot_eaten
+    @player.on_dot_eaten
+    @score += (kind == :power ? 50 : 10)
+    if kind == :power
+      args.state.audio.on_power_pellet(args)
+      @player.gain_ammo
+    else
+      args.state.audio.on_dot_collected(args, entry[:color])
     end
+
+    on_track_cleared(gx, gy, entry[:track_cleared]) if entry[:track_cleared]
   end
 
   # G1: a colour's last dot was just eaten. Flat bonus + popup at the dot's
@@ -532,7 +538,7 @@ class Game
 
       @ghosts.each do |g|
         next if g.despawned? || g.state == :in_house || g.state == :eaten
-        next unless rects_overlap?(p.rect, g.rect)
+        next unless rects_overlap?(p.collision_rect, g.rect)
 
         apply_bullet_to(g)
         p.kill! # ADR-0011: bullets are always consumed on contact

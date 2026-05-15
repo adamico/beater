@@ -9,6 +9,10 @@ class Projectile
   # Default size; Game passes a CELL_SIZE-relative value (ADR-0008). Kept as a
   # constant so size-agnostic tests can reference it symbolically.
   SIZE = 40
+  # Collision rect (centered on bullet) decoupled from the render quad so the
+  # hit registers near the visible bullet body, not at the sprite's transparent
+  # padding. Tune toward 32 if hits still feel late.
+  COLLISION_SIZE = 48
   SPRITE_PATH = "sprites/bullet.png"
   SPRITE_TILE_WIDTH = 32
   # = bullet.png width / SPRITE_TILE_WIDTH; bump when the sheet grows beyond one frame.
@@ -30,6 +34,13 @@ class Projectile
 
   def rect
     { x: @x, y: @y, w: @w, h: @h }
+  end
+
+  def collision_rect
+    cx = @x + @w / 2.0
+    cy = @y + @h / 2.0
+    { x: cx - COLLISION_SIZE / 2.0, y: cy - COLLISION_SIZE / 2.0,
+      w: COLLISION_SIZE, h: COLLISION_SIZE }
   end
 
   def dead?

@@ -7,7 +7,6 @@
 ## Audio
 
 ## Gameplay
-- G4: tweak player hitbox (probably needs to be different size from the sprite for better feel)
 - G5: bonus score collectables
 
 ## UI
