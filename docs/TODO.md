@@ -13,8 +13,7 @@
 
 - UI1: Title screen (with title, background, credits, social, play button)
 - UI2: Settings screen (graphics, accessibility, audio, controls)
-  - accessibility: G6 territory system is colour-load-bearing — add a non-colour channel:
-    distinct dot *shape* per territory + ghost-identity icon on each HUD enrage gauge.
+- UI3b add ghost-identity icon on each HUD enrage gauge.
 - UI4: Pause menu (resume, settings, exit to title)
 - UI5: Improve Game Over screen with highscore table & time taken
 

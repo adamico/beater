@@ -12,14 +12,13 @@ class Renderer
   BACKGROUND      = [30, 30, 30].freeze
   WALL_COLOR      = { r: 255, g: 255, b: 255 }.freeze
   PELLET_COLOR_BY_KEY = {
-    red:    { r: 255, g: 90,  b: 90  },
-    green:  { r: 90,  g: 230, b: 120 },
-    blue:   { r: 90,  g: 160, b: 255 },
-    yellow: { r: 255, g: 225, b: 90  },
+    red: { r: 255, g: 90, b: 90 },
+    green: { r: 90, g: 230, b: 120 },
+    blue: { r: 90, g: 160, b: 255 },
+    yellow: { r: 255, g: 225, b: 90 }
   }.freeze
   PELLET_COLOR_FALLBACK = { r: 255, g: 200, b: 150 }.freeze
-  POWER_PELLET_COLOR = { r: 255, g: 255, b: 255 }.freeze
-  POPUP_COLOR     = { r: 100, g: 220, b: 255 }.freeze
+  POPUP_COLOR = { r: 100, g: 220, b: 255 }.freeze
   # G1: track-completion popup + meter-flash tint.
   TRACK_POPUP_COLOR = { r: 255, g: 225, b: 90 }.freeze
   METER_FLASH_COLOR = { r: 255, g: 255, b: 255 }.freeze
@@ -27,14 +26,22 @@ class Renderer
   CLIP_BACKGROUND = [0, 0, 0, 0].freeze
 
   # Pellet sizes as a fraction of the cell, so they never drift when CELL_SIZE
-  # changes (ADR-0008). Preserves the original 4/20 and 16/20 ratios.
-  PELLET_SIZE_RATIO       = 0.2
-  POWER_PELLET_SIZE_RATIO = 0.8
+  # changes (ADR-0008). Territory dots upsized from 0.2 so the per-territory
+  # shape (UI3a) is legible; power pellets keep the original 16/20 ratio.
+  PELLET_SIZE_RATIO       = 1.0
+  POWER_PELLET_SIZE_RATIO = 1.2
+
+  # UI3a: distinct musical-accidental shape per territory (♭ ♯ ♮ 𝄪) as the
+  # non-colour identity channel for ADR-0010. Frame order matches the sheet.
+  PELLET_SPRITE_PATH  = 'sprites/dots.png'.freeze
+  PELLET_SPRITE_TILE  = 48
+  PELLET_SPRITE_FRAME = { red: 0, green: 1, blue: 2, yellow: 3 }.freeze
+  POWER_PELLET_SPRITE_FRAME = 4
 
   HUD_AMMO_ICON_SIZE = 32
   HUD_AMMO_ICON_GAP  = 4
   HUD_AMMO_ICON_MAX_VISIBLE = 5
-  HUD_AMMO_PATH = "sprites/bullet.png"
+  HUD_AMMO_PATH = 'sprites/bullet.png'
   HUD_AMMO_PLUS_COLOR = { r: 255, g: 220, b: 110 }.freeze
   # Fixed screen-space anchor (bottom-left corner), unaffected by the camera.
   HUD_AMMO_MARGIN_X = 20
@@ -53,14 +60,15 @@ class Renderer
   HUD_METER_GAP    = 12
   HUD_METER_Y      = 698
   HUD_METER_BG     = { r: 55, g: 55, b: 55 }.freeze
-  HUD_METER_COLORS = [:red, :green, :blue, :yellow].freeze
+  HUD_METER_COLORS = %i[red green blue yellow].freeze
 
   def initialize(projection)
     @projection = projection
     @world_target_built = false
   end
 
-  def draw(outputs, maze, pellets, player, ghosts = [], camera:, projectiles: [], popup: nil, track_popups: [], hud: nil, state: :playing)
+  def draw(outputs, maze, pellets, player, ghosts = [], camera:, projectiles: [], popup: nil, track_popups: [],
+           hud: nil, state: :playing)
     @camera = camera
     outputs.background_color = BACKGROUND
     draw_world(outputs, maze)
@@ -86,6 +94,7 @@ class Renderer
 
   def draw_hud_lives(outputs, lives)
     return unless lives
+
     sprites = []
     lives.times do |i|
       sprites << {
@@ -101,6 +110,7 @@ class Renderer
 
   def draw_hud_meters(outputs, completion, meter_flash = nil)
     return unless completion
+
     meter_flash ||= {}
     total_w = HUD_METER_COLORS.size * HUD_METER_W +
               (HUD_METER_COLORS.size - 1) * HUD_METER_GAP
@@ -117,6 +127,7 @@ class Renderer
       # G1: white overlay over the full bar, fading out over the flash window.
       flash = meter_flash[color].to_i
       next if flash <= 0
+
       solids << {
         x: x, y: HUD_METER_Y, w: HUD_METER_W, h: HUD_METER_H,
         **METER_FLASH_COLOR,
@@ -129,9 +140,9 @@ class Renderer
   # Centred banner for the non-playing states.
   def draw_state_banner(outputs, state)
     text = case state
-           when :ready          then "READY?"
-           when :level_complete then "LEVEL COMPLETE"
-           when :game_over      then "GAME OVER"
+           when :ready          then 'READY?'
+           when :level_complete then 'LEVEL COMPLETE'
+           when :game_over      then 'GAME OVER'
            end
     return unless text
 
@@ -144,7 +155,7 @@ class Renderer
     return if state == :ready
 
     outputs.labels << {
-      x: cx, y: cy - 28, text: "press any key", size_enum: 2,
+      x: cx, y: cy - 28, text: 'press any key', size_enum: 2,
       alignment_enum: 1, vertical_alignment_enum: 1, **HUD_DIM_COLOR
     }
   end
@@ -161,6 +172,7 @@ class Renderer
   # within a level; on level reset Game re-news Renderer, resetting the flag.
   def ensure_world_target(outputs, maze)
     return if @world_target_built
+
     rt = outputs[:world_target]
     rt.w = @projection.playfield_w
     rt.h = @projection.playfield_h
@@ -181,6 +193,7 @@ class Renderer
     [-1, 0, 1].each do |k|
       x = ox + k * ww * zoom
       next if x + ww * zoom <= 0 || x >= Camera::SCREEN_W
+
       outputs.sprites << {
         x: x, y: oy, w: ww * zoom, h: wh * zoom,
         path: :world_target
@@ -189,25 +202,34 @@ class Renderer
   end
 
   def draw_pellets(outputs, pellets)
-    solids = []
+    sprites = []
     cell = @projection.cell_size
     pellet_size = (cell * PELLET_SIZE_RATIO).round
     power_size = (cell * POWER_PELLET_SIZE_RATIO).round
     pellets.each_with_color do |(gx, gy), kind, color|
       rect = @projection.cell_rect(gx, gy)
-      size = kind == :power ? power_size : pellet_size
-      pad = (cell - size) / 2
-      rgb = if kind == :power
-              POWER_PELLET_COLOR
-            else
-              PELLET_COLOR_BY_KEY[color] || PELLET_COLOR_FALLBACK
-            end
-      solids.concat(project(
-        x: rect[:x] + pad, y: rect[:y] + pad,
-        w: size, h: size, **rgb
-      ))
+      if kind == :power
+        pad = (cell - power_size) / 2
+        sprites.concat(project(
+                         x: rect[:x] + pad, y: rect[:y] + pad,
+                         w: power_size, h: power_size,
+                         path: PELLET_SPRITE_PATH,
+                         tile_x: POWER_PELLET_SPRITE_FRAME * PELLET_SPRITE_TILE, tile_y: 0,
+                         tile_w: PELLET_SPRITE_TILE, tile_h: PELLET_SPRITE_TILE
+                       ))
+      else
+        pad = (cell - pellet_size) / 2
+        frame = PELLET_SPRITE_FRAME[color] || 0
+        sprites.concat(project(
+                         x: rect[:x] + pad, y: rect[:y] + pad,
+                         w: pellet_size, h: pellet_size,
+                         path: PELLET_SPRITE_PATH,
+                         tile_x: frame * PELLET_SPRITE_TILE, tile_y: 0,
+                         tile_w: PELLET_SPRITE_TILE, tile_h: PELLET_SPRITE_TILE
+                       ))
+      end
     end
-    outputs.solids << solids
+    outputs.sprites << sprites
   end
 
   # Player + ghosts + projectiles, each camera-transformed. Off-screen seam
@@ -222,6 +244,7 @@ class Renderer
 
   def draw_hud_ammo(outputs, player)
     return unless player.respond_to?(:ammo)
+
     ammo = player.ammo
     visible = [ammo, HUD_AMMO_ICON_MAX_VISIBLE].min
     base_x = HUD_AMMO_MARGIN_X
@@ -238,14 +261,14 @@ class Renderer
     end
     outputs.sprites << sprites
 
-    if ammo > HUD_AMMO_ICON_MAX_VISIBLE
-      plus_x = base_x + visible * (HUD_AMMO_ICON_SIZE + HUD_AMMO_ICON_GAP)
-      outputs.labels << {
-        x: plus_x, y: base_y + HUD_AMMO_ICON_SIZE,
-        text: "+", size_enum: 4,
-        **HUD_AMMO_PLUS_COLOR
-      }
-    end
+    return unless ammo > HUD_AMMO_ICON_MAX_VISIBLE
+
+    plus_x = base_x + visible * (HUD_AMMO_ICON_SIZE + HUD_AMMO_ICON_GAP)
+    outputs.labels << {
+      x: plus_x, y: base_y + HUD_AMMO_ICON_SIZE,
+      text: '+', size_enum: 4,
+      **HUD_AMMO_PLUS_COLOR
+    }
   end
 
   # Popup is world-anchored (spawned at a ghost centre) -> camera-transformed.
