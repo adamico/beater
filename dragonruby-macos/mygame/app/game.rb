@@ -248,10 +248,12 @@ class Game
   def enter_paused
     @state = :paused
     @pause_selected = 0
+    args.state.audio.on_pause(args)
   end
 
   def exit_paused
     @state = :playing
+    args.state.audio.on_resume(args)
   end
 
   def tick_paused

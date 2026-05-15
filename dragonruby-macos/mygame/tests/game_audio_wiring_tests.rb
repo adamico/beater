@@ -123,6 +123,14 @@ class AudioSpy
   def on_game_over(_args)
   end
 
+  def on_pause(args)
+    set_duck(args, active: true, gain_scale: 0.12, ramp_in: 12, ramp_out: 12)
+  end
+
+  def on_resume(args)
+    set_duck(args, active: false, gain_scale: 0.12, ramp_in: 12, ramp_out: 12)
+  end
+
   def set_duck(_args, active:, gain_scale:, ramp_in:, ramp_out:, immediate: false)
     @duck_calls << {
       active: active,

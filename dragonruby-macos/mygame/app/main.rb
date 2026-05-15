@@ -27,6 +27,8 @@ unless PROGRESSION_TESTER_MODE
   require 'app/scenes/menu_scene'
   require 'app/scenes/title'
   require 'app/scenes/settings'
+  require 'app/scenes/credits'
+  require 'app/scenes/instructions'
 end
 
 def boot(_args)
@@ -57,6 +59,12 @@ def tick(args)
   when :settings
     $settings ||= Scenes::Settings.new
     $settings.tick(args)
+  when :credits
+    $credits ||= Scenes::Credits.new
+    $credits.tick(args)
+  when :instructions
+    $instructions ||= Scenes::Instructions.new
+    $instructions.tick(args)
   when :playing
     $game ||= Game.new
     $game.args = args
@@ -81,6 +89,8 @@ def apply_scene_swap(args)
     # Returning to title from anywhere drops the run.
     $game = nil
     $settings = nil
+    $credits = nil
+    $instructions = nil
     Audio::NativeBridge.reset_runtime_state!
     args.state.audio = nil
   when :playing

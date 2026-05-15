@@ -102,6 +102,25 @@ module Audio
                      ramp_out: 8)
     end
 
+    # Pause ducks the music to background level via the same envelope as
+    # death; resume eases back. BeatClock is tick-driven so audio stays in
+    # phase regardless of how long the game was paused.
+    PAUSE_DUCK_RAMP = 12
+
+    def on_pause(args)
+      set_duck(args, active: true,
+                     gain_scale: DEATH_DUCK_GAIN_SCALE,
+                     ramp_in: PAUSE_DUCK_RAMP,
+                     ramp_out: PAUSE_DUCK_RAMP)
+    end
+
+    def on_resume(args)
+      set_duck(args, active: false,
+                     gain_scale: DEATH_DUCK_GAIN_SCALE,
+                     ramp_in: PAUSE_DUCK_RAMP,
+                     ramp_out: PAUSE_DUCK_RAMP)
+    end
+
     # Music eases back in to the current mix while the camera returns
     # (Dying phase 2). `ramp_out` matches the camera ease duration.
     def on_respawn(args, ramp_out: 30)

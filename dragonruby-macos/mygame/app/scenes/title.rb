@@ -10,11 +10,12 @@ module Scenes
     TITLE = 'BEAT2R'
     TAGLINE = 'Maze. Beat. Repeat.'
     CREDITS = 'kc00l @ Fifth Layer Studio 2026'
-    ITEMS = %i[play settings instructions quit].freeze
+    ITEMS = %i[play settings instructions credits quit].freeze
     LABELS = {
       play: 'PLAY',
       settings: 'SETTINGS',
       instructions: 'INSTRUCTIONS',
+      credits: 'CREDITS',
       quit: 'QUIT'
     }.freeze
 
@@ -43,6 +44,7 @@ module Scenes
       when :play then SceneDirector.request(:playing)
       when :settings then SceneDirector.request(:settings, return_to: :title)
       when :instructions then SceneDirector.request(:instructions)
+      when :credits then SceneDirector.request(:credits)
       when :quit then $gtk.request_quit
       end
     end
