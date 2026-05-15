@@ -1,38 +1,39 @@
 # app/ghost.rb
-require 'app/direction.rb'
-require 'app/grid_mover.rb'
-require 'app/tiles.rb'
-require 'app/ghost_controllers.rb'
+require 'app/direction'
+require 'app/grid_mover'
+require 'app/tiles'
+require 'app/ghost_controllers'
 
 GHOST_DEBUG_LOGS = false
 
 class Ghost
   include GridMover
 
-  IDENTITIES = [:blinky, :pinky, :inky, :clyde].freeze
+  IDENTITIES = %i[blinky pinky inky clyde].freeze
 
   SPRITES = {
-    blinky: "sprites/square/red.png",
-    pinky: "sprites/square/violet.png",
-    inky:  "sprites/square/blue.png",
-    clyde: "sprites/square/orange.png",
-    eaten: "sprites/hexagon/white.png"
+    blinky: 'sprites/square/green.png',
+    pinky: 'sprites/square/red.png',
+    inky: 'sprites/square/yellow.png',
+    clyde: 'sprites/square/blue.png',
+    eaten: 'sprites/hexagon/white.png'
   }.freeze
 
   attr_accessor :controller, :eaten_flash_ticks
-  attr_reader   :enrage_step, :absorbed_hits, :armor_flash_ticks
-  attr_reader :state, :identity, :scatter_target, :spawn_cell
 
   def state=(new_state)
     if @state != new_state
       caller_line = caller(1, 1).first.to_s.split('/').last
-      puts "[GHOST STATE] tick=#{Kernel.tick_count} id=#{@identity} #{@state.inspect} -> #{new_state.inspect} " \
-           "dir=#{@direction&.name} role=#{@role.inspect} from=#{caller_line}" if GHOST_DEBUG_LOGS
+      if GHOST_DEBUG_LOGS
+        puts "[GHOST STATE] tick=#{Kernel.tick_count} id=#{@identity} #{@state.inspect} -> #{new_state.inspect} " \
+             "dir=#{@direction&.name} role=#{@role.inspect} from=#{caller_line}"
+      end
     end
     @state = new_state
   end
 
-  def initialize(identity:, x:, y:, w:, h:, speed:, scatter_target:, spawn_cell:, controller:, direction: Direction::LEFT, sprite_scale: 1.0, sprite_offset_x: nil, sprite_offset_y: nil)
+  def initialize(identity:, x:, y:, w:, h:, speed:, scatter_target:, spawn_cell:, controller:,
+                 direction: Direction::LEFT, sprite_scale: 1.0, sprite_offset_x: nil, sprite_offset_y: nil)
     init_grid_mover(x: x, y: y, w: w, h: h, speed: speed, direction: direction)
     @identity = identity
     @scatter_target = scatter_target
@@ -87,9 +88,8 @@ class Ghost
 
   STUCK_LOG_THRESHOLD = 120 # 2s @ 60fps
 
-  def base_speed
-    @base_speed
-  end
+  attr_reader :enrage_step, :absorbed_hits, :armor_flash_ticks, :state, :identity, :scatter_target, :spawn_cell,
+              :base_speed
 
   # Sprite is rendered at sprite_scale times the logical 1-cell rect (default
   # 2x = arcade 2x2 quad), centered via sprite_offset_x/y. Tweak via init args.
@@ -145,6 +145,7 @@ class Ghost
 
   def update(intent:, maze:, projection:)
     return if flashing? # frozen during eaten-hit animation; resumes when anim ends
+
     speed_tol = speed.to_f + GhostControllers::DECISION_EPSILON
 
     old_x = @x
@@ -162,9 +163,7 @@ class Ghost
 
     # If movement was rolled back by collision and we're near a cell center,
     # snap to the center so transition/turn logic can progress on next tick.
-    if !moved && at_cell_center?(projection, tolerance: speed_tol)
-      snap_to_cell_center!(projection)
-    end
+    snap_to_cell_center!(projection) if !moved && at_cell_center?(projection, tolerance: speed_tol)
 
     # Ghost couldn't move this tick — release the Targeting one-decision-per-
     # cell latch so the controller can re-decide next tick. Corner-loop
@@ -194,13 +193,15 @@ class Ghost
     y_cells = (@y - projection.offset_y).to_f / cs
     err = [(x_cells - x_cells.round).abs * cs, (y_cells - y_cells.round).abs * cs]
     decision = at_cell_center?(projection, tolerance: speed_tol)
-    walk = Direction::ALL_MOVING.map { |d|
+    walk = Direction::ALL_MOVING.map do |d|
       [d.name, maze.walkable?(gx + d.dx, gy + d.dy, role: @role)]
-    }.to_h
+    end.to_h
+    return unless GHOST_DEBUG_LOGS
+
     puts "[GHOST STUCK] tick=#{Kernel.tick_count} id=#{@identity} state=#{@state} " \
          "stuck_ticks=#{@stuck_ticks} pos=(#{@x.round(2)},#{@y.round(2)}) " \
          "cell=(#{gx},#{gy}) center_err=(#{err[0].round(3)},#{err[1].round(3)}) " \
          "tol=#{speed_tol.round(3)} at_decision=#{decision} dir=#{@direction.name} " \
-         "speed=#{@speed} role=#{@role.inspect} walk=#{walk.inspect}" if GHOST_DEBUG_LOGS
+         "speed=#{@speed} role=#{@role.inspect} walk=#{walk.inspect}"
   end
 end
