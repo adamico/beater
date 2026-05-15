@@ -3,33 +3,34 @@
 ## Bugs & Tweaks
 
 ## Visuals
+- V1: ghosts animated sprites (idle, move, frightened, eaten)
+- add player ghost trail like vampire survivors
+- improve hit feedback (ghosts, player, dots)
+- rhythm hint in ghost sprites (pulse, glow)
+- proper level graphics in place of bland white walls
 
 ## Audio
 
 ## Gameplay
 
 ## UI
+- UI3: (depends on V1) add ghost-identity icon on each HUD enrage gauge.
 
 ## tests & tools
+
+- TT1: add god mode toggle to progression tester for easier testing of later levels and mechanics
 
 # Polish after MVP
 
 ## Visual
-- V1: ghosts animated sprites (idle, move, frightened, eaten)
-- add player ghost trail like vampire survivors
-- improve hit feedback (ghosts, player, dots)
-- rhythm hint in ghost sprites (pulse, glow)
-- proper level graphics in place of bland white walls
 - shaders
 - particles
 
 ## UI
-- UI3: (depends on V1) add ghost-identity icon on each HUD enrage gauge.
 
 ## Audio
 
 - rethink to introduce complexification of music tracks with dot track completion. this would need at least 3 variations of each track (base, mid, full) and a way to transition between them smoothly, the beat must be synced.
-- better eating sound effect which should probably like a 5th stem
 
 ## Gameplay
 
