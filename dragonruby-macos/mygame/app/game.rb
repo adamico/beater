@@ -77,6 +77,7 @@ class Game
       cell_size: CELL_SIZE
     )
     @spawn_cells = scan_spawn_cells
+    @prison_cells = scan_prison_cells
     @player_spawn = scan_player_spawn
     @above_door_cell = @spawn_cells[:blinky]
 
@@ -139,6 +140,16 @@ class Game
     cells
   end
 
+  # G6: locate the four prison cells (k/l/m/n) — one per ghost identity.
+  def scan_prison_cells
+    cells = {}
+    @maze.each_cell do |gx, gy, ch|
+      id = Tiles::PRISON_TO_IDENTITY[ch]
+      cells[id] = [gx, gy] if id
+    end
+    cells
+  end
+
   def initialize_ghosts
     bounds = @maze.visible_cell_bounds
     # OG-style off-map scatter targets: unreachable points beyond each
@@ -171,11 +182,11 @@ class Game
 
   def reset_ghost_states
     @release_schedule.reset
-    # Pre-mark despawned ghosts as already released so the schedule never
+    # Pre-mark imprisoned ghosts as already released so the schedule never
     # tries to spawn them out of the house (G6 Pacify persists through death).
-    @ghosts.each { |g| @release_schedule.mark_released(g.identity) if g.despawned? }
+    @ghosts.each { |g| @release_schedule.mark_released(g.identity) if g.imprisoned? }
     @ghosts.each do |g|
-      next if g.despawned? # G6: pacified ghosts stay gone across death
+      next if g.imprisoned? # G6: pacified ghosts stay imprisoned across death
 
       GhostControllers::Targeting.clear_latch(g.identity)
       if g.identity == :blinky
@@ -240,7 +251,7 @@ class Game
     @eat_sequencer.tick(args)
     tick_track_fx
     if @eat_sequencer.frozen?
-      visible_ghosts = @ghosts.reject { |g| g.despawned? || (g.state == :eaten && !g.flashing?) }
+      visible_ghosts = @ghosts.reject { |g| g.state == :eaten && !g.flashing? }
       update_camera
       draw_frame(ghosts: visible_ghosts)
       return
@@ -367,7 +378,7 @@ class Game
   def respawn_actors
     reset_player_to_spawn
     @ghosts.each do |g|
-      next if g.despawned? # G6: pacified ghosts have no body to teleport
+      next if g.imprisoned? # G6: pacified ghosts stay locked in their prison cell
 
       cell = @spawn_cells[g.identity]
       rect = @projection.cell_rect(*cell)
@@ -386,7 +397,7 @@ class Game
     args.state.audio.on_respawn(args, ramp_out: @camera.dying_ease_duration)
   end
 
-  def draw_frame(ghosts: @ghosts.reject(&:despawned?))
+  def draw_frame(ghosts: @ghosts)
     @renderer.draw(
       outputs, @maze, @pellets, @player, ghosts,
       camera: @camera,
@@ -418,7 +429,7 @@ class Game
   end
 
   def apply_phase_to_ghosts(mode)
-    @ghosts.each { |g| @ghost_fsm.apply_phase(g, mode) unless g.despawned? }
+    @ghosts.each { |g| @ghost_fsm.apply_phase(g, mode) unless g.imprisoned? }
   end
 
   def tick_releases
@@ -479,18 +490,24 @@ class Game
     pacify_owner_of(color)
   end
 
-  # G6 Pacify: clearing a Territory permanently despawns its owner ghost.
-  # Marks released so the schedule never re-spawns it, drops the controller,
-  # and sets state = :despawned (the filter every hot loop checks via
-  # despawned?). Persists across player death — clearance is monotonic.
+  # G6 Pacify: clearing a Territory teleports its owner ghost into that
+  # ghost's prison cell and locks it there (:imprisoned). Marks released so
+  # the schedule never re-spawns it, drops the controller. Persists across
+  # player death — clearance is monotonic.
   def pacify_owner_of(color)
     id = Territory.owner_of(color)
     return unless id
 
     ghost = @ghosts.find { |g| g.identity == id }
-    return unless ghost && !ghost.despawned?
+    return unless ghost && !ghost.imprisoned?
 
-    ghost.state = :despawned
+    cell = @prison_cells[id]
+    if cell
+      rect = @projection.cell_rect(*cell)
+      ghost.x = rect[:x]
+      ghost.y = rect[:y]
+    end
+    ghost.state = :imprisoned
     ghost.controller = nil
     @release_schedule.mark_released(id)
   end
@@ -537,7 +554,7 @@ class Game
       next if p.dead?
 
       @ghosts.each do |g|
-        next if g.despawned? || g.state == :in_house || g.state == :eaten
+        next if g.imprisoned? || g.state == :in_house || g.state == :eaten
         next unless rects_overlap?(p.collision_rect, g.rect)
 
         apply_bullet_to(g)
@@ -571,7 +588,7 @@ class Game
     debug = args&.state&.debug_ghost
     apply_dynamic_speeds
     @ghosts.each do |g|
-      next if g.despawned? || g.state == :in_house
+      next if g.imprisoned? || g.state == :in_house
 
       @ghost_fsm.tick_transitions(g, debug: debug)
       next unless g.controller
@@ -586,7 +603,7 @@ class Game
   # remain in *its* Territory (the quadrant it owns by scatter corner).
   def apply_dynamic_speeds
     @ghosts.each do |g|
-      next if g.despawned? || g.state == :in_house || g.state == :leaving_house
+      next if g.imprisoned? || g.state == :in_house || g.state == :leaving_house
 
       g.enrage_step = enrage_for(g)
 
@@ -619,7 +636,7 @@ class Game
 
   def tick_collisions
     @ghosts.each do |g|
-      next if g.despawned? || g.state == :in_house || g.state == :eaten
+      next if g.imprisoned? || g.state == :in_house || g.state == :eaten
       next unless rects_overlap?(@player.rect, g.rect)
 
       enter_dying

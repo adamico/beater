@@ -23,7 +23,7 @@ class ReleaseSchedule
     @released[id]
   end
 
-  # G6: a Pacified (despawned) ghost must be marked released so the schedule
+  # G6: a Pacified (imprisoned) ghost must be marked released so the schedule
   # never tries to release it.
   def mark_released(id)
     @released[id] = true

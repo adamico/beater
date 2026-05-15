@@ -18,7 +18,21 @@ module Tiles
   SPAWN_PLAYER = "P"
   SPAWN_MARKERS = [SPAWN_BLINKY, SPAWN_PINKY, SPAWN_INKY, SPAWN_CLYDE, SPAWN_PLAYER].freeze
 
-  WALKABLE = [PELLET, POWER_PELLET, EMPTY, TUNNEL, GHOST_HOME, *SPAWN_MARKERS].freeze
+  # G6: prison cells — one per ghost. Pacified ghost is teleported to its cell
+  # and held there in :imprisoned. Walkable so the player passes through freely.
+  PRISON_BLINKY = "k"
+  PRISON_PINKY  = "l"
+  PRISON_INKY   = "m"
+  PRISON_CLYDE  = "n"
+  PRISON_MARKERS = [PRISON_BLINKY, PRISON_PINKY, PRISON_INKY, PRISON_CLYDE].freeze
+  PRISON_TO_IDENTITY = {
+    PRISON_BLINKY => :blinky,
+    PRISON_PINKY  => :pinky,
+    PRISON_INKY   => :inky,
+    PRISON_CLYDE  => :clyde
+  }.freeze
+
+  WALKABLE = [PELLET, POWER_PELLET, EMPTY, TUNNEL, GHOST_HOME, *SPAWN_MARKERS, *PRISON_MARKERS].freeze
 
   ROLE_DEFAULT       = :default
   ROLE_GHOST_EATEN   = :ghost_eaten

@@ -7,7 +7,6 @@
 ## Audio
 
 ## Gameplay
-- G5: bonus score collectables
 
 ## UI
 
@@ -34,9 +33,9 @@
 - better eating sound effect which should probably like a 5th stem
 
 ## Gameplay
-- G6 prison cell: instead of plain despawn on `Pacify`, a maze-layout prison cell
-  that visibly traps the pacified ghost — much stronger read than vanishing.
 
+- G5: bonus score collectables or other collectables?
+- 
 # Future ideas
 
 ## Gameplay

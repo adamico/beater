@@ -97,11 +97,12 @@ class Ghost
     @eaten_flash_ticks && @eaten_flash_ticks > 0
   end
 
-  # G6 Pacify: a despawned ghost has been permanently removed for the rest
-  # of the level by clearing its `Territory`. Skipped by tick / collision /
-  # render / phase-apply / release-schedule.
-  def despawned?
-    @state == :despawned
+  # G6 Pacify: an imprisoned ghost has been teleported to its prison cell and
+  # is held there for the rest of the level (its `Territory` is cleared).
+  # Still rendered (dimmed) but skipped by tick / collision / phase-apply /
+  # release-schedule.
+  def imprisoned?
+    @state == :imprisoned
   end
 
   def to_sprite
@@ -136,11 +137,14 @@ class Ghost
     end
     off_x = (@w * scale - @w) / 2.0
     off_y = (@h * scale - @h) / 2.0
-    {
+    sprite = {
       x: @x - off_x, y: @y - off_y,
       w: @w * scale, h: @h * scale,
       path: path
     }
+    # G6: imprisoned ghosts read as neutralised — dim + desaturate (grey tint).
+    sprite.merge!(a: 110, r: 160, g: 160, b: 160) if @state == :imprisoned
+    sprite
   end
 
   def update(intent:, maze:, projection:)
