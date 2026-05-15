@@ -18,6 +18,16 @@ class FakeKeyDown
   def f3
     false
   end
+
+  # Any key not explicitly defined reads as "not pressed". Keeps tests
+  # resilient as Game / MenuInput touch new keys (escape, p, w_scancode...).
+  def method_missing(_name, *_args)
+    false
+  end
+
+  def respond_to_missing?(_name, _include_private = false)
+    true
+  end
 end
 
 class FakeKeyboard
@@ -281,6 +291,9 @@ end
 
 def test_audio_manager_linearly_updates_track_gain_from_completion args, assert
   force_legacy_audio_backend!
+  # Pin GameSettings to defaults so the music bus is deterministic — a local
+  # settings.txt would otherwise change the final gain.
+  GameSettings.reset!
   audio_args = make_args_with_audio_spy
   manager = Audio::Manager.new(audio_args)
 
@@ -288,8 +301,10 @@ def test_audio_manager_linearly_updates_track_gain_from_completion args, assert
   manager.on_dot_collected(audio_args, :red)
   manager.tick(audio_args)
 
-  expected_gain = Audio::TRACK_CONFIGS[:drums].start_gain + 0.25 *
-                  (Audio::TRACK_CONFIGS[:drums].end_gain - Audio::TRACK_CONFIGS[:drums].start_gain)
+  progression_gain = Audio::TRACK_CONFIGS[:drums].start_gain + 0.25 *
+                     (Audio::TRACK_CONFIGS[:drums].end_gain - Audio::TRACK_CONFIGS[:drums].start_gain)
+  # sync_gains scales the track gain by the master*music bus (Phase 2 audio buses).
+  expected_gain = progression_gain * GameSettings.music_gain
 
   assert.equal! manager.completion[:drums], 0.25
   assert.equal! audio_args.audio[:track_drums][:gain], expected_gain

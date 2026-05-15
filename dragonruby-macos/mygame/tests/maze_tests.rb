@@ -69,15 +69,17 @@ end
 def test_pacman_tunnel_precision args, assert
   maze = Maze.from_layout(MapLayouts::PACMAN_LAYOUT)
   # Tunnel row is layout index 15 (top-down) of a 33-row layout ->
-  # after y-flip: gy = 33 - 1 - 15 = 17.
+  # after y-flip: gy = 33 - 1 - 15 = 17. The row is:
+  #   `tttttt.___vLippcRv___.tttttt`
+  # so cols 0..5 are tunnel, col 6 is a pellet, cols 7..9 are empty floor,
+  # col 10 is the wall column `v`.
   gy = 17
-  # Cols 0..6 marked `t` -> tunnel.
-  (0..6).each { |gx| assert.true! maze.tunnel?(gx, gy) }
-  # Col 7 is `.` (pellet) — previously misclassified, must be non-tunnel now.
-  assert.true!  maze.walkable?(7, gy)
-  assert.false! maze.tunnel?(7, gy)
-  # Cols 8..10 are `_` empty floor — also non-tunnel.
-  (8..10).each do |gx|
+  (0..5).each { |gx| assert.true! maze.tunnel?(gx, gy) }
+  # Col 6 is `.` (pellet) — walkable, not tunnel.
+  assert.true!  maze.walkable?(6, gy)
+  assert.false! maze.tunnel?(6, gy)
+  # Cols 7..9 are `_` empty floor — also walkable, not tunnel.
+  (7..9).each do |gx|
     assert.true!  maze.walkable?(gx, gy)
     assert.false! maze.tunnel?(gx, gy)
   end
