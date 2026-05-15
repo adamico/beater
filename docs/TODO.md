@@ -14,8 +14,10 @@
 
 ## tests & tools
 - reenable DRGTK console shortcuts
-- add a jukebox mode to listen to music and sfx without playing, for testing and fun
-
+- jukebox mute only mutes, when clicked again it doesn't unmute
+- jukebox solo doesn't work
+- jukebox tracks should be muted by default
+  
 # Polish after MVP
 
 ## Visual

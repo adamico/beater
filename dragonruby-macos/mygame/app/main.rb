@@ -29,6 +29,8 @@ unless PROGRESSION_TESTER_MODE
   require 'app/scenes/settings'
   require 'app/scenes/credits'
   require 'app/scenes/instructions'
+  # Jukebox scene reuses the ProgressionTester UI verbatim.
+  require 'tools/progression_tester'
 end
 
 def boot(_args)
@@ -65,6 +67,9 @@ def tick(args)
   when :instructions
     $instructions ||= Scenes::Instructions.new
     $instructions.tick(args)
+  when :jukebox
+    ProgressionTester.tick(args)
+    SceneDirector.draw_fade(args.outputs) if SceneDirector.transitioning?
   when :playing
     $game ||= Game.new
     $game.args = args
@@ -91,6 +96,7 @@ def apply_scene_swap(args)
     $settings = nil
     $credits = nil
     $instructions = nil
+    args.state.pt_version = nil
     Audio::NativeBridge.reset_runtime_state!
     args.state.audio = nil
   when :playing
@@ -103,6 +109,12 @@ def apply_scene_swap(args)
     end
   when :settings
     # Settings can be reached from title or pause — both keep $game intact.
+  when :jukebox
+    # Jukebox is reachable only from title where $game is already nil.
+    # Drop audio so ProgressionTester rebuilds a fresh Audio::Manager.
+    Audio::NativeBridge.reset_runtime_state!
+    args.state.audio = nil
+    args.state.pt_version = nil
   end
 end
 

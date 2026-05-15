@@ -105,11 +105,63 @@ module ProgressionTester
   # ---------------------------------------------------------------------------
   # Entry point
   # ---------------------------------------------------------------------------
+  # SFX side panel — clickable list to audition every SFX_DEFINITIONS entry.
+  # Reachable from the title via the :jukebox scene; also runs standalone via
+  # ./run_progression_tester (tools mode).
+  SFX_PANEL_X = 1060
+  SFX_PANEL_Y_TOP = 620
+  SFX_ROW_H = 30
+  SFX_PANEL_W = 200
+  SFX_ROW_GAP = 4
+
   def self.tick(args)
-    init(args) if args.state.pt_version != TOOL_VERSION
+    # Re-init whenever audio is missing — happens on jukebox scene re-entry
+    # (apply_scene_swap nils args.state.audio).
+    init(args) if args.state.pt_version != TOOL_VERSION || args.state.audio.nil?
     handle_input(args)
+    handle_sfx_panel(args)
+    handle_exit_input(args)
     update_audio(args)
     render(args)
+  end
+
+  def self.sfx_names
+    Audio::SFXPlayer::SFX_DEFINITIONS.keys
+  end
+
+  def self.sfx_row_rect(index)
+    {
+      x: SFX_PANEL_X,
+      y: SFX_PANEL_Y_TOP - (index + 1) * SFX_ROW_H - index * SFX_ROW_GAP,
+      w: SFX_PANEL_W,
+      h: SFX_ROW_H
+    }
+  end
+
+  def self.handle_sfx_panel(args)
+    mouse = args.inputs.mouse
+    return unless mouse.button_left && mouse.click
+
+    sfx_names.each_with_index do |name, i|
+      next unless point_in_rect?(mouse.x, mouse.y, sfx_row_rect(i))
+
+      Audio::SFXPlayer.play(args, name)
+      post_message(args, "SFX: #{name.to_s.upcase}")
+      return
+    end
+  end
+
+  def self.handle_exit_input(args)
+    kb = args.inputs.keyboard.key_down
+    return unless kb.escape || kb.q
+
+    # mruby parses `defined?` as a method call, not a keyword, so use
+    # const_defined? to probe whether the main app stack is loaded.
+    if Object.const_defined?(:SceneDirector)
+      SceneDirector.request(:title)
+    else
+      $gtk.request_quit
+    end
   end
 
   TOOL_VERSION = 3   # bump to force re-init on hot reload
@@ -261,34 +313,27 @@ module ProgressionTester
     audio = args.state.audio
     return unless audio
 
-    audio.tick(args)
-
     solo = args.state.pt_solo
     muted = args.state.pt_muted
 
+    # Write slider ratios straight into the progression's completion hash so
+    # the next sync_gains call inside audio.tick computes track gain/cutoff
+    # against them. Bypasses on_dot_collected (counter-based) for 1:1 mapping.
     TRACK_ORDER.each do |track|
-      comp = args.state.pt_completion[track]
+      audio.completion[track] = args.state.pt_completion[track]
+    end
 
-      # Directly write completion into AudioManager's internal state.
-      # We bypass on_dot_collected (which increments a counter) and instead
-      # write the exact ratio so the slider maps 1:1 to the envelope.
-      audio.instance_variable_get(:@completion)[track] = comp
-      audio.instance_variable_get(:@players)[track].update_completion(comp)
+    audio.tick(args)
 
-      # Solo logic: mute non-soloed tracks via args.audio gain override
+    # Apply mute/solo overrides AFTER sync_gains, so the zero gain sticks for
+    # the frame. The override is re-applied every tick because sync_gains
+    # otherwise restores the progression-derived gain.
+    TRACK_ORDER.each do |track|
       key = :"track_#{track}"
-      if args.audio[key]
-        target_gain = if muted[track] || (solo && solo != track)
-                        0.0
-                      else
-                        1.0
-                      end
+      next unless args.audio[key]
 
-        if (args.state.pt_gain_override[track] - target_gain).abs > 0.001
-          args.audio[key].gain = target_gain
-          args.state.pt_gain_override[track] = target_gain
-        end
-      end
+      silenced = muted[track] || (solo && solo != track)
+      args.audio[key].gain = 0.0 if silenced
     end
 
     # Decay meter values toward current completion (VU meter feel)
@@ -332,6 +377,9 @@ module ProgressionTester
 
     # Scope (mini waveform visualiser bottom-right)
     render_scope(args, out)
+
+    # SFX panel (right-hand column)
+    render_sfx_panel(args, out)
   end
 
   def self.render_header(args, out)
@@ -529,6 +577,26 @@ module ProgressionTester
         rect: { x: start_x + (btn_w + gap) * 3, y: btn_y, w: btn_w, h: btn_h },
         action: -> { init(args); post_message(args, 'RESET') } },
     ]
+  end
+
+  def self.render_sfx_panel(args, out)
+    mx = args.inputs.mouse.x
+    my = args.inputs.mouse.y
+
+    # Header
+    out.labels << label(SFX_PANEL_X + SFX_PANEL_W / 2, SFX_PANEL_Y_TOP - 4,
+                        'SFX', size: 2, align: 1, **PAL[:label_bright])
+
+    sfx_names.each_with_index do |name, i|
+      rect = sfx_row_rect(i)
+      hot = point_in_rect?(mx, my, rect)
+      fill = hot ? PAL[:btn_hot] : PAL[:btn_idle]
+      out.solids << bg_rect(rect[:x], rect[:y], rect[:w], rect[:h], fill)
+      out.borders << { x: rect[:x], y: rect[:y], w: rect[:w], h: rect[:h], **PAL[:separator] }
+      out.labels << label(rect[:x] + 10, rect[:y] + rect[:h] - 8,
+                          name.to_s.upcase, size: -2,
+                          **(hot ? PAL[:label_bright] : PAL[:label]))
+    end
   end
 
   def self.render_status_bar(args, out)

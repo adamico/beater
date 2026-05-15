@@ -10,11 +10,12 @@ module Scenes
     TITLE = 'BEAT2R'
     TAGLINE = 'Maze. Beat. Repeat.'
     CREDITS = 'kc00l @ Fifth Layer Studio 2026'
-    ITEMS = %i[play settings instructions credits quit].freeze
+    ITEMS = %i[play settings instructions jukebox credits quit].freeze
     LABELS = {
       play: 'PLAY',
       settings: 'SETTINGS',
       instructions: 'INSTRUCTIONS',
+      jukebox: 'JUKEBOX',
       credits: 'CREDITS',
       quit: 'QUIT'
     }.freeze
@@ -44,6 +45,7 @@ module Scenes
       when :play then SceneDirector.request(:playing)
       when :settings then SceneDirector.request(:settings, return_to: :title)
       when :instructions then SceneDirector.request(:instructions)
+      when :jukebox then SceneDirector.request(:jukebox)
       when :credits then SceneDirector.request(:credits)
       when :quit then $gtk.request_quit
       end
@@ -70,7 +72,6 @@ module Scenes
 
       render_title_and_tagline(outputs)
       render_menu_items(outputs)
-      render_instructions(outputs)
       render_credits(outputs)
       SceneDirector.draw_fade(outputs)
     end
@@ -90,16 +91,6 @@ module Scenes
       MenuRenderer.draw_items(
         outputs, item_rects, ITEMS.map { |k| LABELS[k] }, @selected
       )
-    end
-
-    def render_instructions(outputs)
-      outputs.primitives << {
-        x: SCREEN_W / 2, y: 120,
-        text: 'Use arrow keys/WASD or mouse to navigate, Space/Enter or click to select',
-        size_enum: -2,
-        alignment_enum: 1,
-        r: 140, g: 140, b: 160
-      }.label!
     end
 
     def render_credits(outputs)
