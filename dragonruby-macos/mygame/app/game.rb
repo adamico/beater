@@ -22,9 +22,11 @@ require 'app/eat_sequencer'
 require 'app/projectile'
 require 'data/maps/pacman_layout'
 require 'app/scenes/scene_director'
+require 'app/scenes/scene_layout'
 require 'app/scenes/menu_input'
 require 'app/scenes/menu_controller'
 require 'app/scenes/menu_renderer'
+require 'app/highscores'
 
 class Game
   attr_dr
@@ -97,6 +99,7 @@ class Game
     @score = 0
     @lives = STARTING_LIVES
     @level = 1
+    @play_ticks = 0 # ADR-0013: only advances during tick_playing
     @audio_state_for = nil
     @projectiles = []
     @track_popups = []      # G1: Game-owned score popups for track completion
@@ -336,6 +339,7 @@ class Game
   end
 
   def tick_playing
+    @play_ticks += 1 # ADR-0013: exactly once per tick_playing call
     if pause_pressed?
       enter_paused
       draw_frame
@@ -409,11 +413,189 @@ class Game
     draw_frame
   end
 
+  GAME_OVER_ITEMS = %i[retry back_to_title].freeze
+  GAME_OVER_LABELS = { retry: 'RETRY', back_to_title: 'BACK TO TITLE' }.freeze
+  GAME_OVER_ITEM_W = 320
+  GAME_OVER_ITEM_H = 52
+  GAME_OVER_ITEM_GAP = 14
+  GAME_OVER_MENU_TOP_Y = 200
+
   def tick_game_over
     @game_over_ticks += 1
-    request_reset_if_any_key if @game_over_ticks > GAME_OVER_INPUT_GRACE_TICKS
-    update_camera
-    draw_frame
+    case @game_over_phase
+    when :initials then handle_initials_input
+    when :menu     then handle_game_over_menu
+    end
+    draw_game_over_screen
+  end
+
+  def handle_initials_input
+    return if SceneDirector.transitioning?
+
+    if Scenes::MenuInput.cancel?(args)
+      # Skip initials entry — score is not recorded.
+      @game_over_phase = :menu
+      return
+    end
+    if Scenes::MenuInput.confirm?(args)
+      commit_initials
+      return
+    end
+
+    v = Scenes::MenuInput.navigate_delta(args)
+    # Up (-1) advances the letter (A→B); Down (+1) goes back.
+    @initials[@initials_slot] = (@initials[@initials_slot] - v) % 26 if v != 0
+
+    h = Scenes::MenuInput.horizontal_delta(args)
+    @initials_slot = (@initials_slot + h) % 3 if h != 0
+  end
+
+  def commit_initials
+    letters = @initials.map { |i| ('A'.ord + i).chr }.join
+    date = (Time.now.strftime('%Y-%m-%d') rescue '----')
+    @final_rank = Highscores.insert(
+      score: @score, level_reached: @level,
+      time_seconds: @play_ticks / 60, initials: letters, date: date
+    )
+    @game_over_phase = :menu
+  end
+
+  def handle_game_over_menu
+    return if SceneDirector.transitioning?
+    return if @game_over_ticks < GAME_OVER_INPUT_GRACE_TICKS
+
+    result = Scenes::MenuController.update(
+      args,
+      selected: @game_over_selected,
+      count: GAME_OVER_ITEMS.length,
+      item_rects: game_over_item_rects
+    )
+    @game_over_selected = result[:selected]
+    case result[:action]
+    when :activate then activate_game_over_item
+    when :cancel   then args.state.request_game_reset = true
+    end
+  end
+
+  def activate_game_over_item
+    case GAME_OVER_ITEMS[@game_over_selected]
+    when :retry         then args.state.request_replay = true
+    when :back_to_title then args.state.request_game_reset = true
+    end
+  end
+
+  def game_over_item_rects
+    Scenes::MenuRenderer.item_rects(
+      GAME_OVER_ITEMS.length,
+      screen_w: Scenes::SceneLayout::SCREEN_W,
+      top_y: GAME_OVER_MENU_TOP_Y,
+      item_w: GAME_OVER_ITEM_W,
+      item_h: GAME_OVER_ITEM_H,
+      gap: GAME_OVER_ITEM_GAP
+    )
+  end
+
+  def draw_game_over_screen
+    outputs.background_color = [12, 8, 24]
+    draw_game_over_header
+    draw_game_over_stats
+    draw_highscore_table
+    if @game_over_phase == :initials
+      draw_initials_rotor
+    else
+      draw_game_over_menu
+    end
+  end
+
+  def draw_game_over_header
+    Scenes::MenuRenderer.draw_heading(
+      outputs, 'GAME OVER',
+      x: Scenes::SceneLayout::SCREEN_W / 2,
+      y: Scenes::SceneLayout.header_center_y,
+      size: 14
+    )
+  end
+
+  def draw_game_over_stats
+    time = Highscores.format_time(@play_ticks / 60)
+    outputs.primitives << {
+      x: Scenes::SceneLayout::SCREEN_W / 2, y: 590,
+      text: "SCORE #{@score}    LEVEL #{@level}    TIME #{time}",
+      size_enum: 5, alignment_enum: 1, vertical_alignment_enum: 1,
+      r: 220, g: 220, b: 220
+    }.label!
+  end
+
+  def draw_highscore_table
+    cx = Scenes::SceneLayout::SCREEN_W / 2
+    outputs.primitives << {
+      x: cx, y: 530, text: 'HIGHSCORES',
+      size_enum: 4, alignment_enum: 1, vertical_alignment_enum: 1,
+      r: 255, g: 230, b: 100
+    }.label!
+
+    row_top = 490
+    row_h = 28
+    Highscores.entries.each_with_index do |e, i|
+      rank = i + 1
+      is_new = (@final_rank == rank)
+      color = is_new ? { r: 255, g: 230, b: 100 } : { r: 220, g: 220, b: 220 }
+      line = "#{rank}.  #{e[:initials]}   #{e[:score]}   L#{e[:level_reached]}   #{Highscores.format_time(e[:time_seconds])}"
+      outputs.primitives << {
+        x: cx, y: row_top - i * row_h,
+        text: line, size_enum: 2,
+        alignment_enum: 1, vertical_alignment_enum: 1,
+        **color
+      }.label!
+    end
+  end
+
+  def draw_initials_rotor
+    cx = Scenes::SceneLayout::SCREEN_W / 2
+    outputs.primitives << {
+      x: cx, y: 210,
+      text: 'NEW HIGHSCORE — ENTER INITIALS',
+      size_enum: 3, alignment_enum: 1, vertical_alignment_enum: 1,
+      r: 255, g: 230, b: 100
+    }.label!
+
+    slot_w = 60
+    slot_gap = 30
+    total_w = 3 * slot_w + 2 * slot_gap
+    start_x = cx - total_w / 2
+    box_y = 110
+    box_h = 80
+    3.times do |i|
+      is_sel = (i == @initials_slot)
+      char = ('A'.ord + @initials[i]).chr
+      box = { x: start_x + i * (slot_w + slot_gap), y: box_y, w: slot_w, h: box_h }
+      fill = is_sel ? Scenes::MenuRenderer::SELECTED_FILL : Scenes::MenuRenderer::UNSELECTED_FILL
+      border = is_sel ? Scenes::MenuRenderer::SELECTED_BORDER : Scenes::MenuRenderer::UNSELECTED_BORDER
+      outputs.primitives << box.merge(fill).solid!
+      outputs.primitives << box.merge(border).border!
+      outputs.primitives << {
+        x: box[:x] + box[:w] / 2, y: box[:y] + box[:h] / 2,
+        text: char, size_enum: 8,
+        alignment_enum: 1, vertical_alignment_enum: 1,
+        r: 255, g: 255, b: 255
+      }.label!
+    end
+
+    outputs.primitives << {
+      x: cx, y: 70,
+      text: 'Up/Down change letter  —  Left/Right move slot  —  Enter confirm  —  Esc skip',
+      size_enum: 0, alignment_enum: 1, vertical_alignment_enum: 1,
+      r: 160, g: 160, b: 180
+    }.label!
+  end
+
+  def draw_game_over_menu
+    Scenes::MenuRenderer.draw_items(
+      outputs, game_over_item_rects,
+      GAME_OVER_ITEMS.map { |k| GAME_OVER_LABELS[k] },
+      @game_over_selected,
+      label_size: 4
+    )
   end
 
   def enter_dying
@@ -428,6 +610,11 @@ class Game
   def enter_game_over
     @state = :game_over
     @game_over_ticks = 0
+    @game_over_selected = 0
+    @final_rank = nil
+    @initials = [0, 0, 0]
+    @initials_slot = 0
+    @game_over_phase = Highscores.qualifies?(@score) ? :initials : :menu
     args.state.audio.on_game_over(args)
   end
 
@@ -777,10 +964,6 @@ class Game
     args.state.audio.on_level_complete_duck_clear(args)
     args.state.audio.on_level_complete(args)
     true
-  end
-
-  def request_reset_if_any_key
-    args.state.request_game_reset = true if any_key_pressed?
   end
 
   def toggle_audio_debug_watch

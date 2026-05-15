@@ -4,3 +4,4 @@ dragonruby-macos/logs/
 dragonruby-macos/tmp/
 dragonruby-macos/mygame/native/**/*.dylib
 dragonruby-macos/mygame/settings.txt
+dragonruby-macos/mygame/highscores.txt

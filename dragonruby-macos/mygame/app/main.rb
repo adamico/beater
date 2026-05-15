@@ -16,6 +16,7 @@ PROGRESSION_TESTER_MODE = (
 require 'tools/progression_tester' if PROGRESSION_TESTER_MODE
 unless PROGRESSION_TESTER_MODE
   require 'app/game_settings'
+  require 'app/highscores'
   require 'app/game'
   require 'app/scenes/scene_director'
   require 'app/scenes/scene_layout'
@@ -36,6 +37,7 @@ def boot(_args)
   end
   GameSettings.load!
   GameSettings.apply_window!
+  Highscores.load!
 end
 
 def tick(args)
@@ -64,9 +66,11 @@ def tick(args)
 
   Scenes::SceneLayout.tick_debug(args)
 
-  return unless args.state.request_game_reset
-
-  reset(args)
+  if args.state.request_replay
+    replay(args)
+  elsif args.state.request_game_reset
+    reset(args)
+  end
 end
 
 # Runs once per scene swap, at the fade apex. Build/teardown live `Game`,
@@ -98,4 +102,14 @@ def reset(args)
   args.state.audio = nil
   args.state.request_game_reset = false
   SceneDirector.request(:title)
+end
+
+# RETRY from game-over: full Game rebuild without bouncing through title.
+# Re-enters scene :playing; apply_scene_swap sees $game == nil and rebuilds.
+def replay(args)
+  $game = nil
+  Audio::NativeBridge.reset_runtime_state!
+  args.state.audio = nil
+  args.state.request_replay = false
+  SceneDirector.request(:playing)
 end
