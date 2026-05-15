@@ -1,5 +1,5 @@
-require 'app/game.rb'
-require_relative 'game_audio_wiring_tests.rb'
+require 'app/game'
+require_relative 'game_audio_wiring_spec'
 
 # Bullet vs ghost: any active ghost (chase/scatter/leaving) → killed via
 # EatSequencer. :eaten and :in_house ghosts pass through. After kill,
@@ -26,7 +26,7 @@ def first_active_ghost(game)
   game.instance_variable_get(:@ghosts).find { |g| g.state != :in_house && g.state != :eaten }
 end
 
-def test_bullet_kills_active_ghost args, assert
+def test_bullet_kills_active_ghost(_args, assert)
   game, _args = kill_test_setup
   ghost = first_active_ghost(game)
   starting_state = ghost.state
@@ -40,7 +40,7 @@ def test_bullet_kills_active_ghost args, assert
   assert.true!  game.instance_variable_get(:@eat_sequencer).frozen?
 end
 
-def test_bullet_passes_through_eaten_ghost args, assert
+def test_bullet_passes_through_eaten_ghost(_args, assert)
   game, _args = kill_test_setup
   ghost = first_active_ghost(game)
   ghost.state = :eaten
@@ -51,7 +51,7 @@ def test_bullet_passes_through_eaten_ghost args, assert
   assert.false! projectile.dead?
 end
 
-def test_bullet_passes_through_in_house_ghost args, assert
+def test_bullet_passes_through_in_house_ghost(_args, assert)
   game, _args = kill_test_setup
   ghost = game.instance_variable_get(:@ghosts).find { |g| g.state == :in_house }
   assert.true! !ghost.nil?
@@ -62,7 +62,7 @@ def test_bullet_passes_through_in_house_ghost args, assert
   assert.false! projectile.dead?
 end
 
-def test_bullet_kill_routes_through_eat_sequencer_score args, assert
+def test_bullet_kill_routes_through_eat_sequencer_score(_args, assert)
   game, _args = kill_test_setup
   ghost = first_active_ghost(game)
   score_before = game.instance_variable_get(:@score)

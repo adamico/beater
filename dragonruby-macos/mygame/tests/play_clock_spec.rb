@@ -1,5 +1,5 @@
-require 'app/game.rb'
-require_relative 'game_audio_wiring_tests.rb'
+require 'app/game'
+require_relative 'game_audio_wiring_spec'
 
 # ADR-0013: @play_ticks counts the time the player was actually playing.
 # It advances exactly once per tick_playing call and does not advance in
@@ -26,7 +26,7 @@ class FakeOutputs
   attr_accessor :background_color
   attr_reader :primitives, :solids, :sprites
 
-  alias_method :_orig_initialize_play_clock_outputs, :initialize
+  alias _orig_initialize_play_clock_outputs initialize
   def initialize
     _orig_initialize_play_clock_outputs
     @primitives = []
@@ -37,6 +37,7 @@ end
 
 class FakeMouse
   attr_accessor :x, :y, :click, :moved
+
   def initialize
     @x = -1
     @y = -1
@@ -49,7 +50,7 @@ class FakeInputs
   attr_accessor :up_down, :left_right
   attr_reader :mouse
 
-  alias_method :_orig_initialize_play_clock, :initialize
+  alias _orig_initialize_play_clock initialize
   def initialize
     _orig_initialize_play_clock
     @up_down = 0

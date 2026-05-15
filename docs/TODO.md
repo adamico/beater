@@ -2,8 +2,6 @@
 
 ## Bugs & Tweaks
 
-- BT1: when the hotloaded tests are added to the list, it causes a game reset. this causes issues, for example when choosing to go back to title with the keyboard, the game tries to restart and then goes back to title
-
 ## Visuals
 
 ## Audio

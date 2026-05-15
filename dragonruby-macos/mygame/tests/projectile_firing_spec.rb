@@ -1,5 +1,5 @@
-require 'app/game.rb'
-require_relative 'game_audio_wiring_tests.rb'
+require 'app/game'
+require_relative 'game_audio_wiring_spec'
 
 # Edge-triggered fire input: pressing Space spends one ammo and spawns a
 # projectile in the player's current direction. Empty mag, no direction,
@@ -31,7 +31,7 @@ def release_space!(args)
   args.inputs.keyboard.key_down.define_singleton_method(:space) { false }
 end
 
-def test_fire_with_ammo_and_direction_spawns_projectile args, assert
+def test_fire_with_ammo_and_direction_spawns_projectile(_args, assert)
   game, sys_args, player = fire_test_game
   player.gain_ammo
   press_space!(sys_args)
@@ -42,7 +42,7 @@ def test_fire_with_ammo_and_direction_spawns_projectile args, assert
   assert.equal! player.ammo, Player::AMMO_PER_POWER_PELLET - 1
 end
 
-def test_fire_with_zero_ammo_is_noop args, assert
+def test_fire_with_zero_ammo_is_noop(_args, assert)
   game, sys_args, player = fire_test_game
   player.reset_ammo!
   press_space!(sys_args)
@@ -51,7 +51,7 @@ def test_fire_with_zero_ammo_is_noop args, assert
   assert.equal! player.ammo, 0
 end
 
-def test_fire_when_stationary_is_noop args, assert
+def test_fire_when_stationary_is_noop(_args, assert)
   game, sys_args, player = fire_test_game
   player.gain_ammo
   player.face(Direction::NONE)
@@ -62,7 +62,7 @@ def test_fire_when_stationary_is_noop args, assert
   assert.equal! player.ammo, Player::AMMO_PER_POWER_PELLET
 end
 
-def test_no_fire_when_space_not_pressed args, assert
+def test_no_fire_when_space_not_pressed(_args, assert)
   game, sys_args, player = fire_test_game
   player.gain_ammo
   release_space!(sys_args)
@@ -71,7 +71,7 @@ def test_no_fire_when_space_not_pressed args, assert
   assert.equal! player.ammo, Player::AMMO_PER_POWER_PELLET
 end
 
-def test_two_presses_spawn_two_projectiles args, assert
+def test_two_presses_spawn_two_projectiles(_args, assert)
   game, sys_args, player = fire_test_game
   player.gain_ammo
   press_space!(sys_args)

@@ -1,5 +1,5 @@
-require 'app/game.rb'
-require_relative 'game_audio_wiring_tests.rb'
+require 'app/game'
+require_relative 'game_audio_wiring_spec'
 
 # Body-contact with any non-house, non-eaten ghost kills the player.
 # The frightened-eats-on-touch path is gone (ADR-0007).
@@ -20,7 +20,7 @@ def first_active_ghost_for_collision(game)
   game.instance_variable_get(:@ghosts).find { |g| g.state != :in_house && g.state != :eaten }
 end
 
-def test_body_contact_with_active_ghost_enters_dying args, assert
+def test_body_contact_with_active_ghost_enters_dying(_args, assert)
   game, _args = collision_setup
   ghost = first_active_ghost_for_collision(game)
   lives_before = game.instance_variable_get(:@lives)
@@ -37,13 +37,13 @@ def test_body_contact_with_active_ghost_enters_dying args, assert
   assert.true! player.dying?
 end
 
-def test_body_contact_with_eaten_ghost_does_not_kill args, assert
+def test_body_contact_with_eaten_ghost_does_not_kill(_args, assert)
   game, _args = collision_setup
   ghost = first_active_ghost_for_collision(game)
   ghost.state = :eaten
   place_player_on_ghost(game, ghost)
   spawn_cell = game.instance_variable_get(:@player_spawn)
-  spawn = game.instance_variable_get(:@projection).cell_rect(*spawn_cell)
+  game.instance_variable_get(:@projection).cell_rect(*spawn_cell)
   pre_x = game.instance_variable_get(:@player).x
 
   game.tick_collisions
@@ -54,7 +54,7 @@ def test_body_contact_with_eaten_ghost_does_not_kill args, assert
   assert.equal! player.x, pre_x
 end
 
-def test_player_dies_preserves_ammo args, assert
+def test_player_dies_preserves_ammo(_args, assert)
   game, _args = collision_setup
   player = game.instance_variable_get(:@player)
   player.gain_ammo
@@ -66,7 +66,7 @@ def test_player_dies_preserves_ammo args, assert
   assert.equal! player.ammo, Player::AMMO_PER_POWER_PELLET
 end
 
-def test_level_complete_resets_ammo args, assert
+def test_level_complete_resets_ammo(_args, assert)
   game, _args = collision_setup
   player = game.instance_variable_get(:@player)
   player.gain_ammo

@@ -8,7 +8,7 @@ cd dragonruby-macos
 export SDL_VIDEODRIVER=dummy
 
 status=0
-for file in mygame/tests/*_tests.rb; do
+for file in mygame/tests/*_spec.rb; do
   echo "=== $file ==="
   if ! ./dragonruby mygame --test "$file"; then
     status=1
