@@ -3,8 +3,8 @@ require 'app/enrage.rb'
 
 def test_territory_color_to_owner_mapping args, assert
   # Each colour quadrant is owned by the ghost that scatters to its corner.
-  assert.equal! Territory.owner_of(:red),    :pinky
-  assert.equal! Territory.owner_of(:green),  :blinky
+  assert.equal! Territory.owner_of(:red),    :blinky
+  assert.equal! Territory.owner_of(:green),  :pinky
   assert.equal! Territory.owner_of(:blue),   :clyde
   assert.equal! Territory.owner_of(:yellow), :inky
 end

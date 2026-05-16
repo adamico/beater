@@ -164,8 +164,8 @@ class Game
     # on-map targets they oscillate between the two corridor intersections
     # adjacent to the corner cell instead of taking the vertical path.
     scatter_targets = {
-      blinky: [bounds[:gx1], bounds[:gy1] + 3],
-      pinky: [bounds[:gx0], bounds[:gy1] + 3],
+      blinky: [bounds[:gx0], bounds[:gy1] + 3],
+      pinky: [bounds[:gx1], bounds[:gy1] + 3],
       inky: [bounds[:gx1], bounds[:gy0] - 3],
       clyde: [bounds[:gx0], bounds[:gy0] - 3]
     }

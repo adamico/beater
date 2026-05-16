@@ -1,4 +1,3 @@
-# app/ghost.rb
 require 'app/direction'
 require 'app/grid_mover'
 require 'app/tiles'
@@ -12,11 +11,23 @@ class Ghost
   IDENTITIES = %i[blinky pinky inky clyde].freeze
 
   SPRITES = {
-    blinky: 'sprites/square/green.png',
-    pinky: 'sprites/square/red.png',
+    blinky: 'sprites/square/red.png',
+    pinky: 'sprites/square/green.png',
     inky: 'sprites/square/yellow.png',
     clyde: 'sprites/square/blue.png',
     eaten: 'sprites/hexagon/white.png'
+  }.freeze
+
+  # Multi-frame sheets per identity. Identities without an entry fall through
+  # to SPRITES (single static path, square @w*@h render). Sheet identities
+  # render at native (w, h) px (player-style), with frame select driven by
+  # enrage step + armor flash (see #to_sprite).
+  SHEETS = {
+    blinky: {
+      path: 'sprites/guitar_blinky.png',
+      w: 64, h: 96,
+      frames: { normal: 0, hurt: 1, enraged: 2 }
+    }
   }.freeze
 
   attr_accessor :controller, :eaten_flash_ticks
@@ -106,16 +117,23 @@ class Ghost
   end
 
   def to_sprite
+    sheet = SHEETS[@identity]
+    sprite = sheet && @state != :eaten ? sheet_sprite(sheet) : legacy_sprite
+    sprite.merge!(a: 110, r: 160, g: 160, b: 160) if @state == :imprisoned
+    sprite
+  end
+
+  private
+
+  def legacy_sprite
     if flashing?
-      age = EATEN_FLASH_TICKS - @eaten_flash_ticks # 0..EATEN_FLASH_TICKS-1
-      @eaten_flash_ticks -= 1                      # render-time tick (advances during sim hitstop)
+      age = EATEN_FLASH_TICKS - @eaten_flash_ticks
+      @eaten_flash_ticks -= 1
       if age < EATEN_GROW_TICKS
-        # Phase A: identity sprite, ease scale 1.0 -> PEAK (ease-out).
         t = age.to_f / EATEN_GROW_TICKS
         eased = 1.0 - (1.0 - t) * (1.0 - t)
         scale = @sprite_scale * (1.0 + (EATEN_FLASH_PEAK_SCALE - 1.0) * eased)
       else
-        # Phase B: identity sprite, ease scale PEAK -> END_SCALE (ease-in).
         shrink_age = age - EATEN_GROW_TICKS
         shrink_total = EATEN_FLASH_TICKS - EATEN_GROW_TICKS
         t = (shrink_age.to_f / shrink_total).clamp(0.0, 1.0)
@@ -128,8 +146,6 @@ class Ghost
       path = @state == :eaten ? SPRITES[:eaten] : SPRITES[@identity]
       scale = @sprite_scale
       if @armor_flash_ticks > 0
-        # ADR-0011 partial / immune bullet hit: brief scale pulse, no state
-        # change. Eases out so the kick is on impact, settles fast.
         t = @armor_flash_ticks.to_f / ARMOR_FLASH_TICKS
         scale *= 1.0 + ARMOR_FLASH_SCALE_BUMP * t
         @armor_flash_ticks -= 1
@@ -137,15 +153,63 @@ class Ghost
     end
     off_x = (@w * scale - @w) / 2.0
     off_y = (@h * scale - @h) / 2.0
-    sprite = {
+    {
       x: @x - off_x, y: @y - off_y,
       w: @w * scale, h: @h * scale,
       path: path
     }
-    # G6: imprisoned ghosts read as neutralised — dim + desaturate (grey tint).
-    sprite.merge!(a: 110, r: 160, g: 160, b: 160) if @state == :imprisoned
-    sprite
   end
+
+  # Multi-frame sheet render (player-style, fixed native px). Frame select:
+  # enrage2 → enraged; else armor_flash → hurt; else normal. Sprite swap is the
+  # hit cue — no scale pulse on top (would stack with the frame swap).
+  # Eaten-hit anim still scales the normal frame about its centre.
+  def sheet_sprite(sheet)
+    sw = sheet[:w]
+    sh = sheet[:h]
+    scale = 1.0
+    if flashing?
+      age = EATEN_FLASH_TICKS - @eaten_flash_ticks
+      @eaten_flash_ticks -= 1
+      if age < EATEN_GROW_TICKS
+        t = age.to_f / EATEN_GROW_TICKS
+        eased = 1.0 - (1.0 - t) * (1.0 - t)
+        scale = 1.0 + (EATEN_FLASH_PEAK_SCALE - 1.0) * eased
+      else
+        shrink_age = age - EATEN_GROW_TICKS
+        shrink_total = EATEN_FLASH_TICKS - EATEN_GROW_TICKS
+        t = (shrink_age.to_f / shrink_total).clamp(0.0, 1.0)
+        eased = t * t
+        scale = EATEN_FLASH_PEAK_SCALE +
+                (EATEN_FLASH_END_SCALE - EATEN_FLASH_PEAK_SCALE) * eased
+      end
+      frame_key = :normal
+    else
+      frame_key = if @enrage_step == :enrage2 then :enraged
+                  elsif @armor_flash_ticks > 0 then :hurt
+                  else :normal
+                  end
+      @armor_flash_ticks -= 1 if @armor_flash_ticks > 0
+    end
+    w = sw * scale
+    h = sh * scale
+    # Centred on the logical cell like the player sprite: a 64x96 sheet over a
+    # 48x48 cell extends ~½ cell on every side. offset = (cell - native)/2.
+    cx = @x + @w / 2.0
+    cy = @y + @h / 2.0
+    {
+      x: cx - w / 2.0,
+      y: cy - h / 2.0,
+      w: w, h: h,
+      path: sheet[:path],
+      tile_x: sheet[:frames][frame_key] * sw,
+      tile_y: 0,
+      tile_w: sw,
+      tile_h: sh
+    }
+  end
+
+  public
 
   def update(intent:, maze:, projection:)
     return if flashing? # frozen during eaten-hit animation; resumes when anim ends

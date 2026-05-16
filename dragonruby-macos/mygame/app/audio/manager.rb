@@ -8,7 +8,7 @@ require 'app/game_settings.rb'
 module Audio
   class Manager
     TRACKS     = [:drums, :bass, :lead, :chords].freeze
-    DOT_COLORS = { red: :drums, green: :bass, blue: :lead, yellow: :chords }.freeze
+    DOT_COLORS = { red: :bass, green: :drums, blue: :lead, yellow: :chords }.freeze
 
     # Retained only for on_level_complete_duck_clear (defensive duck reset).
     EAT_DUCK_GAIN_SCALE  = 0.4

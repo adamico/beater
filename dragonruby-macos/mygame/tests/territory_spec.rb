@@ -15,8 +15,8 @@ end
 def test_territory_matches_scatter_corner_geometry args, assert
   # Sanity: the four corner-anchored ghosts each own the matching quadrant.
   # red=top-left, green=top-right, blue=bottom-left, yellow=bottom-right.
-  assert.equal! Territory.owner_of(:red),    :pinky
-  assert.equal! Territory.owner_of(:green),  :blinky
+  assert.equal! Territory.owner_of(:red),    :blinky
+  assert.equal! Territory.owner_of(:green),  :pinky
   assert.equal! Territory.owner_of(:blue),   :clyde
   assert.equal! Territory.owner_of(:yellow), :inky
 end

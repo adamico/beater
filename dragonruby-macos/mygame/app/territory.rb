@@ -2,14 +2,14 @@
 # corner — a mapping that falls out of existing geometry, see ADR-0010 and
 # CONTEXT.md "Territory":
 #
-#   red    (top-left)     -> Pinky
-#   green  (top-right)    -> Blinky
+#   red    (top-left)     -> Blinky
+#   green  (top-right)    -> Pinky
 #   blue   (bottom-left)  -> Clyde
 #   yellow (bottom-right) -> Inky
 module Territory
   COLOR_TO_GHOST = {
-    red:    :pinky,
-    green:  :blinky,
+    red:    :blinky,
+    green:  :pinky,
     blue:   :clyde,
     yellow: :inky
   }.freeze
