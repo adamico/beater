@@ -34,9 +34,12 @@ module Tiles
 
   WALKABLE = [PELLET, POWER_PELLET, EMPTY, TUNNEL, GHOST_HOME, *SPAWN_MARKERS, *PRISON_MARKERS].freeze
 
-  ROLE_DEFAULT       = :default
-  ROLE_GHOST_EATEN   = :ghost_eaten
-  ROLE_GHOST_LEAVING = :ghost_leaving
+  ROLE_DEFAULT         = :default
+  ROLE_GHOST_EATEN     = :ghost_eaten
+  ROLE_GHOST_LEAVING   = :ghost_leaving
+  # G6: pacified-in-transit ghost flies through walls to its prison cell
+  # (which is a walled-off island by design — see pacman_layout).
+  ROLE_GHOST_PACIFYING = :ghost_pacifying
 
   PASSABILITY = {
     ROLE_DEFAULT       => WALKABLE,
@@ -49,6 +52,7 @@ module Tiles
   end
 
   def self.passable_for?(ch, role)
+    return true if role == ROLE_GHOST_PACIFYING
     table = PASSABILITY[role] || WALKABLE
     table.include?(ch)
   end

@@ -200,7 +200,7 @@ class Ghost
       end
       frame_key = :normal
     else
-      frame_key = if @state == :eaten then :eaten
+      frame_key = if @state == :eaten || @state == :imprisoning then :eaten
                   elsif @enrage_step == :enrage2 then :enraged
                   elsif @armor_flash_ticks > 0 then :hurt
                   else :normal

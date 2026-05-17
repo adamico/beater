@@ -25,6 +25,17 @@ class GhostStateMachine
     snap_to_cell(ghost)
   end
 
+  # G6 Pacify: starts the eaten-flash scale anim in place, then routes the
+  # ghost (boosted, same as :eaten return-to-house) to its prison cell. On
+  # arrival, tick_transitions locks it into :imprisoned.
+  def enter_imprisoning(ghost, prison_cell)
+    ghost.state = :imprisoning
+    ghost.role = Tiles::ROLE_GHOST_PACIFYING
+    ghost.controller = GhostControllers::ToPrison.new(prison_cell)
+    ghost.speed = ghost.base_speed * Ghost::EATEN_SPEED_MULTIPLIER
+    snap_to_cell(ghost)
+  end
+
   def apply_phase(ghost, mode)
     return unless ghost.state == :scatter || ghost.state == :chase
     ghost.state = mode
@@ -36,6 +47,14 @@ class GhostStateMachine
     when :eaten
       log_transition_attempt(ghost, ghost.spawn_cell, :eaten_to_leaving) if debug
       transition_at_cell_center(ghost, ghost.spawn_cell) { start_leaving(ghost) }
+    when :imprisoning
+      target = ghost.controller.target
+      log_transition_attempt(ghost, target, :imprisoning_to_imprisoned) if debug
+      transition_at_cell_center(ghost, target) do
+        ghost.state = :imprisoned
+        ghost.controller = nil
+        ghost.speed = 0
+      end
     when :leaving_house
       log_transition_attempt(ghost, @above_door_cell, :leaving_to_chase) if debug
       transition_at_cell_center(ghost, @above_door_cell) do

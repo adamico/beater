@@ -672,7 +672,7 @@ class Game
   def respawn_actors
     reset_player_to_spawn
     @ghosts.each do |g|
-      next if g.imprisoned? # G6: pacified ghosts stay locked in their prison cell
+      next if g.imprisoned? || g.state == :imprisoning # G6: locked or in transit
 
       cell = @spawn_cells[g.identity]
       rect = @projection.cell_rect(*cell)
@@ -803,12 +803,16 @@ class Game
 
     cell = @prison_cells[id]
     if cell
-      rect = @projection.cell_rect(*cell)
-      ghost.x = rect[:x]
-      ghost.y = rect[:y]
+      # Cinematic transit: eaten-flash scale anim at current position, then
+      # ghost zooms (boosted) to its prison cell, locks into :imprisoned on
+      # arrival (see GhostStateMachine#tick_transitions for the :imprisoning
+      # branch).
+      ghost.eaten_flash_ticks = Ghost::EATEN_FLASH_TICKS
+      @ghost_fsm.enter_imprisoning(ghost, cell)
+    else
+      ghost.state = :imprisoned
+      ghost.controller = nil
     end
-    ghost.state = :imprisoned
-    ghost.controller = nil
     @release_schedule.mark_released(id)
   end
 
@@ -855,7 +859,7 @@ class Game
       next if p.dead?
 
       @ghosts.each do |g|
-        next if g.imprisoned? || g.state == :in_house || g.state == :eaten
+        next if g.imprisoned? || g.state == :in_house || g.state == :eaten || g.state == :imprisoning
         next unless rects_overlap?(p.collision_rect, g.rect)
 
         apply_bullet_to(g)
@@ -908,7 +912,7 @@ class Game
 
       g.enrage_step = enrage_for(g)
 
-      next if g.state == :eaten # eaten ghosts ignore tunnel slowdown
+      next if g.state == :eaten || g.state == :imprisoning # transit speed is FSM-owned
 
       g.speed = effective_ghost_speed(g)
     end
@@ -937,7 +941,7 @@ class Game
 
   def tick_collisions
     @ghosts.each do |g|
-      next if g.imprisoned? || g.state == :in_house || g.state == :eaten
+      next if g.imprisoned? || g.state == :in_house || g.state == :eaten || g.state == :imprisoning
       next unless rects_overlap?(@player.rect, g.rect)
 
       enter_dying

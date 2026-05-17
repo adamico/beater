@@ -249,6 +249,21 @@ module GhostControllers
     end
   end
 
+  # G6 Pacify: identical to Eaten but targets the ghost's prison cell instead
+  # of its spawn. Used during the :imprisoning transit; ghost locks to
+  # :imprisoned on arrival.
+  class ToPrison
+    attr_reader :target
+
+    def initialize(target_cell)
+      @target = target_cell
+    end
+
+    def next_direction(world, ghost)
+      BFSTargeting.next_direction(ghost, world, @target)
+    end
+  end
+
   # Targets a fixed exit cell with the ghost's current role (:ghost_leaving).
   # Path through the door + pen corridor is opened by the role's passability.
   class LeavingHouse
