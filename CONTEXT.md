@@ -24,7 +24,7 @@ Maze chase game with a rhythm hook. Diverges from OG Pac-Man where called out. A
 
 - **Life** — integer count of player retries in a run. Starts at 3 on new game. Carries across levels and across death; reset to 3 only on new-game-from-title. Decremented by 1 on entering `dying`. Reaching 0 routes `dying → game_over` instead of respawn. Losing a life does not reset `Ammo` (ammo carry-across is unchanged — see [ADR-0007](docs/adr/0007-finite-ammo-manual-fire.md)). No extra-life-from-score mechanic in the first slice (deferred).
 
-- **Track** — one of the 4 music stems (`drums`, `bass`, `lead`, `chords`), each bound to a dot color via `Audio::Manager::DOT_COLORS` (red→bass, green→drums, blue→lead, yellow→chords). Eating a dot of a color advances its track.
+- **Track** — one of the 4 music stems (`drums`, `bass`, `lead`, `chords`), each bound to a dot color via `Audio::Manager::DOT_COLORS` (red→bass, green→drums, blue→chords, yellow→lead). Eating a dot of a color advances its track.
 
 - **Track completion** — per-`Track` progress ratio: dots eaten of that color ÷ total dots of that color in the level. Dot-based only (not time/score). Drives the audio progression mix and the HUD's 4 track meters. Backed by a live remaining-by-color counter on `Pellets` (decremented on eat), not a rescan. Reaching 100% (the colour's last dot eaten) awards a flat **1000-point track-completion bonus** (G1), fired per-track the instant the count hits 0 — with a score popup at that dot's cell, a HUD meter flash, and an audio stinger. Unlike `Eat freeze` it does not freeze the world. The popup runs on a `Game`-owned path, not `EatSequencer`.
 

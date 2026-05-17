@@ -21,8 +21,8 @@ Apply two paired swaps so the red guitar lands on the bass stem owned by Blinky:
 |--------|--------|-------------------|------------------|
 | TL     | red    | Pinky → **Blinky** | drums → **bass** |
 | TR     | green  | Blinky → **Pinky** | bass → **drums** |
-| BL     | blue   | Clyde              | lead             |
-| BR     | yellow | Inky               | chords           |
+| BL     | blue   | Clyde              | chords           |
+| BR     | yellow | Inky               | lead             |
 
 Concretely:
 

@@ -24,9 +24,24 @@ class Ghost
   # enrage step + armor flash (see #to_sprite).
   SHEETS = {
     blinky: {
-      path: 'sprites/guitar_blinky.png',
+      path: 'sprites/bass_blinky.png',
       w: 64, h: 96,
-      frames: { normal: 0, hurt: 1, enraged: 2 }
+      frames: { normal: 0, hurt: 1, enraged: 2, eaten: 3 }
+    },
+    pinky: {
+      path: 'sprites/drums_pinky.png',
+      w: 64, h: 96,
+      frames: { normal: 0, hurt: 1, enraged: 2, eaten: 3 }
+    },
+    inky: {
+      path: 'sprites/lead_inky.png',
+      w: 64, h: 96,
+      frames: { normal: 0, hurt: 1, enraged: 2, eaten: 3 }
+    },
+    clyde: {
+      path: 'sprites/chords_clyde.png',
+      w: 96, h: 64,
+      frames: { normal: 0, hurt: 1, enraged: 2, eaten: 3 }
     }
   }.freeze
 
@@ -118,7 +133,7 @@ class Ghost
 
   def to_sprite
     sheet = SHEETS[@identity]
-    sprite = sheet && @state != :eaten ? sheet_sprite(sheet) : legacy_sprite
+    sprite = sheet ? sheet_sprite(sheet) : legacy_sprite
     sprite.merge!(a: 110, r: 160, g: 160, b: 160) if @state == :imprisoned
     sprite
   end
@@ -185,7 +200,8 @@ class Ghost
       end
       frame_key = :normal
     else
-      frame_key = if @enrage_step == :enrage2 then :enraged
+      frame_key = if @state == :eaten then :eaten
+                  elsif @enrage_step == :enrage2 then :enraged
                   elsif @armor_flash_ticks > 0 then :hurt
                   else :normal
                   end
