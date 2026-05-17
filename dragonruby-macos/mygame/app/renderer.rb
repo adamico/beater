@@ -14,7 +14,6 @@ class Renderer
   POPUP_COLOR       = { r: 100, g: 220, b: 255 }.freeze
   TRACK_POPUP_COLOR = { r: 255, g: 225, b: 90 }.freeze
   CLIP_BACKGROUND   = [0, 0, 0, 0].freeze
-  HUD_DIM_COLOR     = { r: 200, g: 200, b: 200 }.freeze
 
   # Pellet sizes as a fraction of the cell, so they never drift when CELL_SIZE
   # changes (ADR-0008). Territory dots upsized from 0.2 so the per-territory
@@ -44,40 +43,17 @@ class Renderer
     draw_hud(outputs, hud) if hud && state != :game_over
     draw_popup(outputs, popup) if popup
     track_popups.each { |p| draw_popup(outputs, p, color: TRACK_POPUP_COLOR) }
-    draw_state_banner(outputs, state)
+    outputs.labels << Banner.build(state)[:labels]
     state
   end
 
-  # Hud module owns all HUD layout/state-mapping. Renderer just pushes the
-  # returned primitives into DR's outputs.
+  # Hud + Banner modules own all screen-space overlay layout. Renderer just
+  # pushes the returned primitives into DR's outputs.
   def draw_hud(outputs, hud)
     result = Hud.build(hud)
     outputs.solids  << result[:solids]
     outputs.sprites << result[:sprites]
     outputs.labels  << result[:labels]
-  end
-
-  # Centred banner for the non-playing states.
-  def draw_state_banner(outputs, state)
-    text = case state
-           when :ready          then 'READY?'
-           when :level_complete then 'LEVEL COMPLETE'
-           when :game_over      then 'GAME OVER'
-           end
-    return unless text
-
-    cx = Camera::SCREEN_W / 2
-    cy = Camera::SCREEN_H / 2
-    outputs.labels << {
-      x: cx, y: cy + 24, text: text, size_enum: 12,
-      alignment_enum: 1, vertical_alignment_enum: 1, **Hud::TEXT_COLOR
-    }
-    return if state == :ready
-
-    outputs.labels << {
-      x: cx, y: cy - 28, text: 'press any key', size_enum: 2,
-      alignment_enum: 1, vertical_alignment_enum: 1, **HUD_DIM_COLOR
-    }
   end
 
   # World point -> the 1-2 screen-space copies of a world-space primitive
