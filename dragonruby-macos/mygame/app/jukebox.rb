@@ -33,23 +33,23 @@ module Jukebox
   SFX_ROW_GAP     = 4
 
   COL = {
-    bg:           { r:  14, g:  14, b:  18, a: 255 },
-    panel:        { r:  22, g:  22, b:  28, a: 255 },
-    rail:         { r:  35, g:  35, b:  42, a: 255 },
-    rail_active:  { r:  55, g:  55, b:  65, a: 255 },
-    thumb:        { r: 210, g: 210, b: 220, a: 255 },
-    thumb_hot:    { r: 255, g: 255, b: 255, a: 255 },
-    led_off:      { r:  30, g:  25, b:  10, a: 255 },
-    led_green:    { r:  60, g: 220, b:  80, a: 255 },
-    led_amber:    { r: 230, g: 160, b:  20, a: 255 },
-    led_red:      { r: 220, g:  50, b:  40, a: 255 },
-    label:        { r: 160, g: 155, b: 145, a: 255 },
+    bg: { r: 14, g: 14, b: 18, a: 255 },
+    panel: { r: 22, g: 22, b: 28, a: 255 },
+    rail: { r: 35, g: 35, b: 42, a: 255 },
+    rail_active: { r: 55, g: 55, b:  65, a: 255 },
+    thumb: { r: 210, g: 210, b: 220, a: 255 },
+    thumb_hot: { r: 255, g: 255, b: 255, a: 255 },
+    led_off: { r: 30, g: 25, b: 10, a: 255 },
+    led_green: { r: 60, g: 220, b:  80, a: 255 },
+    led_amber: { r: 230, g: 160, b:  20, a: 255 },
+    led_red: { r: 220, g: 50, b: 40, a: 255 },
+    label: { r: 160, g: 155, b: 145, a: 255 },
     label_bright: { r: 220, g: 215, b: 200, a: 255 },
-    accent:       { r: 230, g: 160, b:  20, a: 255 },
-    solo_idle:    { r:  50, g:  48, b:  42, a: 255 },
-    btn_idle:     { r:  40, g:  40, b:  48, a: 255 },
-    btn_hot:      { r:  60, g:  58, b:  70, a: 255 },
-    separator:    { r:  45, g:  44, b:  52, a: 255 },
+    accent: { r: 230, g: 160, b: 20, a: 255 },
+    solo_idle: { r: 50, g: 48, b: 42, a: 255 },
+    btn_idle: { r: 40, g: 40, b: 48, a: 255 },
+    btn_hot: { r: 60, g: 58, b: 70, a: 255 },
+    separator: { r: 45, g: 44, b: 52, a: 255 }
   }.freeze
 
   # ---------------------------------------------------------------------------
@@ -74,17 +74,17 @@ module Jukebox
     end
 
     args.state.jukebox = {
-      version:    VERSION,
-      players:    players,
-      gain:       TRACKS.each_with_object({}) { |t, h| h[t] = 1.0 },
-      muted:      TRACKS.each_with_object({}) { |t, h| h[t] = true },
-      solo_set:   [],
-      dragging:   nil,
+      version: VERSION,
+      players: players,
+      gain: TRACKS.each_with_object({}) { |t, h| h[t] = 1.0 },
+      muted: TRACKS.each_with_object({}) { |t, h| h[t] = false },
+      solo_set: [],
+      dragging: nil,
       drag_start: nil,
-      meter:      TRACKS.each_with_object({}) { |t, h| h[t] = 0.0 },
-      msg:        nil,
-      msg_ttl:    0,
-      btn_hot:    nil,
+      meter: TRACKS.each_with_object({}) { |t, h| h[t] = 0.0 },
+      msg: nil,
+      msg_ttl: 0,
+      btn_hot: nil
     }
 
     post_message(args, 'JUKEBOX READY')
@@ -97,6 +97,7 @@ module Jukebox
   def self.handle_exit(args)
     kb = args.inputs.keyboard.key_down
     return unless kb.escape || kb.q
+
     SceneDirector.request(:title)
   end
 
@@ -108,7 +109,18 @@ module Jukebox
     st    = args.state.jukebox
     kb    = args.inputs.keyboard
     mouse = args.inputs.mouse
-    mx, my = mouse.x, mouse.y
+    mx = mouse.x
+    my = mouse.y
+
+    if kb.key_down.zero
+      TRACKS.each { |t| set_gain(st, t, 0.0) }
+      post_message(args, 'ALL → 0%')
+    end
+
+    if kb.key_down.f
+      TRACKS.each { |t| set_gain(st, t, 1.0) }
+      post_message(args, 'ALL → 100%')
+    end
 
     # Digit keys: 1..4 toggle mute, SHIFT+1..4 toggle solo membership.
     digit_keys = %i[one two three four]
@@ -213,21 +225,30 @@ module Jukebox
     st = args.state.jukebox
     solo_set = st[:solo_set]
 
+    music_bus = GameSettings.music_gain
+
     TRACKS.each do |track|
       audible = solo_set.empty? ? !st[:muted][track] : solo_set.include?(track)
-      gain    = audible ? st[:gain][track] : 0.0
+      # Slider at 100% = unity stem after settings bus; never adds gain beyond
+      # what GameSettings would apply in-game.
+      gain    = audible ? st[:gain][track] * music_bus : 0.0
 
+      # cutoff at LP ceiling = inaudible filtering. Native DSP defaults to
+      # 1 kHz LP at registration and ignores nil cutoff (-1.0 sentinel means
+      # "keep current") — pushing 20 kHz forces a wide-open filter.
       st[:players][track].apply_mix_settings(
         args,
-        gain:            gain,
-        cutoff_hz:       nil,
-        resonance:       nil,
+        gain: gain,
+        cutoff_hz: 20_000.0,
+        resonance: 0.707,
         duck_multiplier: 1.0,
-        bypass_mix:      1.0,
+        bypass_mix: 1.0
       )
 
-      # VU meter: fast attack, slow decay against the current gain target.
-      target = gain
+      # VU meter tracks slider position (pre-bus), so 100% slider = full meter
+      # regardless of master/music settings. Mute/solo silences both meter and
+      # signal so the LEDs reflect what's actually playing.
+      target = audible ? st[:gain][track] : 0.0
       cur    = st[:meter][track]
       st[:meter][track] = target > cur ? cur + (target - cur) * 0.25 : cur + (target - cur) * 0.04
     end
@@ -267,13 +288,11 @@ module Jukebox
 
     out.solids << rect(sx, STRIP_Y, STRIP_W, STRIP_H, COL[:panel])
 
-    if soloed
-      out.borders << { x: sx, y: STRIP_Y, w: STRIP_W, h: STRIP_H, **COL[:accent], primitive_marker: :border }
-    end
+    out.borders << { x: sx, y: STRIP_Y, w: STRIP_W, h: STRIP_H, **COL[:accent], primitive_marker: :border } if soloed
 
     out.labels << label(sx + STRIP_W / 2, STRIP_Y + STRIP_H - 20,
                         NAMES[track], size: 2, align: 1,
-                        **(soloed ? COL[:accent] : COL[:label_bright]))
+                                      **(soloed ? COL[:accent] : COL[:label_bright]))
 
     # Fader rail + filled portion
     rail = fader_rail_rect(idx)
@@ -286,7 +305,7 @@ module Jukebox
     thumb_col = st[:dragging] == track ? COL[:thumb_hot] : COL[:thumb]
     out.solids << rect(thumb[:x], thumb[:y], thumb[:w], thumb[:h], thumb_col)
     mid_y = thumb[:y] + thumb[:h] / 2
-    out.lines  << { x: thumb[:x] + 2, y: mid_y, x2: thumb[:x] + thumb[:w] - 3, y2: mid_y, **COL[:rail] }
+    out.lines << { x: thumb[:x] + 2, y: mid_y, x2: thumb[:x] + thumb[:w] - 3, y2: mid_y, **COL[:rail] }
 
     # Scale marks
     [0.0, 0.25, 0.5, 0.75, 1.0].each do |mark|
@@ -340,7 +359,7 @@ module Jukebox
       out.labels  << label(btn[:rect][:x] + btn[:rect][:w] / 2,
                            btn[:rect][:y] + btn[:rect][:h] / 2 + 15,
                            btn[:label], size: -2, align: 1,
-                           **(hot ? COL[:accent] : COL[:label_bright]))
+                                        **(hot ? COL[:accent] : COL[:label_bright]))
       out.labels  << label(btn[:rect][:x] + btn[:rect][:w] / 2,
                            btn[:rect][:y] + btn[:rect][:h] / 2 - 4,
                            btn[:key], size: -4, align: 1, **COL[:label])
@@ -377,13 +396,10 @@ module Jukebox
     out.solids << rect(0, 0, SCREEN_W, bar_h, COL[:panel])
     out.lines  << { x: 0, y: bar_h, x2: SCREEN_W, y2: bar_h, **COL[:separator] }
 
-    overall = st[:gain].values.sum / TRACKS.length.to_f
-    out.labels << label(20, bar_h - 8, "OVERALL: #{(overall * 100).round}%", size: -2, **COL[:label_bright])
-
     if st[:msg_ttl] > 0
       alpha = [(st[:msg_ttl] * 4).clamp(0, 255), 255].min
       out.labels << label(SCREEN_W / 2, bar_h - 8, st[:msg].to_s, size: -2, align: 1,
-                          r: COL[:accent][:r], g: COL[:accent][:g], b: COL[:accent][:b], a: alpha)
+                                                                  r: COL[:accent][:r], g: COL[:accent][:g], b: COL[:accent][:b], a: alpha)
     end
 
     out.labels << label(SCREEN_W - 20, bar_h - 8, "tick #{args.tick_count}", size: -4, align: 2, **COL[:label])
@@ -402,7 +418,7 @@ module Jukebox
       x: SFX_PANEL_X,
       y: SFX_PANEL_Y_TOP - (index + 2) * SFX_ROW_H - index * SFX_ROW_GAP,
       w: SFX_PANEL_W,
-      h: SFX_ROW_H,
+      h: SFX_ROW_H
     }
   end
 
@@ -420,7 +436,8 @@ module Jukebox
   end
 
   def self.render_sfx_panel(args, out)
-    mx, my = args.inputs.mouse.x, args.inputs.mouse.y
+    mx = args.inputs.mouse.x
+    my = args.inputs.mouse.y
     out.labels << label(SFX_PANEL_X + SFX_PANEL_W / 2, SFX_PANEL_Y_TOP - 4,
                         'SFX', size: 2, align: 1, **COL[:label_bright])
 
