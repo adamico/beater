@@ -31,18 +31,17 @@ on.
 ## Decision
 
 Stems always stream (registered with `paused: false`, never re-paused by the
-jukebox). Mute is expressed as a gain multiplier of 0 or 1, applied inside
-`Audio::Manager#sync_gains` so it flows through the same path as progression
-gain and duck multiplier — and therefore through `NativeBridge` on the native
-backend.
+jukebox). Mute is expressed as a gain of `0.0` pushed straight through
+`Audio::TrackPlayer#apply_mix_settings` — which routes via `NativeBridge` on
+the native backend, so the native DSP sees the zero too.
 
-- `Audio::Manager` owns a `@mute` hash and a `set_mute(track, bool)` setter.
-- `sync_gains` multiplies each track's progression gain by `0.0` or `1.0`
-  from `@mute`.
-- The jukebox computes silence per frame as
-  `solo ? (solo != track) : muted[track]` and calls `audio.set_mute(track,
-  silenced)` before `audio.tick`. Solo stays a jukebox-only concept; the
-  game never solos.
+- The jukebox owns its own `Audio::TrackPlayer` instances directly; it does
+  not go through `Audio::Manager` (Manager is gameplay-only: progression,
+  duck, SFX). The jukebox's mix surface is "raw gain per stem."
+- Per frame, the jukebox computes `audible = solo_set.empty? ? !muted[t] :
+  solo_set.include?(t)` and pushes `gain: audible ? fader_gain : 0.0`.
+- Solo (single or multi-stem) is a jukebox-only concept; the game never
+  solos.
 
 ## Consequences
 
@@ -56,4 +55,5 @@ backend.
   based game-over track will land there later. Outside game-over, treat
   `paused` on music streams as a code smell.
 - If a future scene needs the silence-the-mix-without-killing-phase
-  behaviour, reuse `set_mute`. Don't reach for `paused`.
+  behaviour, push `gain: 0.0` through `apply_mix_settings`. Don't reach for
+  `paused`.

@@ -53,7 +53,7 @@ def tick(args)
     $instructions ||= Scenes::Instructions.new
     $instructions.tick(args)
   when :jukebox
-    ProgressionTester.tick(args)
+    Jukebox.tick(args)
     SceneDirector.draw_fade(args.outputs) if SceneDirector.transitioning?
   when :playing
     $game ||= Game.new
@@ -81,7 +81,7 @@ def apply_scene_swap(args)
     $settings = nil
     $credits = nil
     $instructions = nil
-    args.state.pt_version = nil
+    args.state.jukebox = nil
     Audio::NativeBridge.reset_runtime_state!
     args.state.audio = nil
   when :playing
@@ -96,10 +96,10 @@ def apply_scene_swap(args)
     # Settings can be reached from title or pause — both keep $game intact.
   when :jukebox
     # Jukebox is reachable only from title where $game is already nil.
-    # Drop audio so ProgressionTester rebuilds a fresh Audio::Manager.
+    # Drop jukebox state so it rebuilds a fresh stem deck on next tick.
     Audio::NativeBridge.reset_runtime_state!
     args.state.audio = nil
-    args.state.pt_version = nil
+    args.state.jukebox = nil
   end
 end
 

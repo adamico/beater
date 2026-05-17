@@ -17,6 +17,7 @@ module Audio
 
     def record_dot(track)
       return nil unless @dot_counts.key?(track)
+
       @dot_counts[track] += 1
       ratio = (@dot_counts[track].to_f / @dot_totals[track]).clamp(0.0, 1.0)
       @completion[track] = ratio
@@ -36,9 +37,7 @@ module Audio
       end
     end
 
-    def completion
-      @completion
-    end
+    attr_reader :completion
 
     def overall_completion
       @completion.values.sum / @tracks.length.to_f
@@ -61,6 +60,7 @@ module Audio
       cfg = @configs[track]
       overrides.each do |key, value|
         raise ArgumentError, "Unknown TrackConfig field '#{key}'" unless cfg.respond_to?(:"#{key}=")
+
         cfg.send(:"#{key}=", value)
       end
     end
