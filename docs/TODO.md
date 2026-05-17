@@ -13,11 +13,10 @@
 ## Gameplay
 
 ## UI
-- UI3: (depends on V1) add ghost-identity icon on each HUD enrage gauge.
 
 ## tests & tools
 
-- TT1: add god mode toggle to progression tester for easier testing of later levels and mechanics
+- TT1: add cheat shorcuts (no collision with ghosts, infinite lives, infinite ammo, no clip to walls) for easier testing of later levels and mechanics
 
 # Polish after MVP
 
