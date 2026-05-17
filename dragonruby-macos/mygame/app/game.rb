@@ -10,6 +10,7 @@ require 'app/player'
 require 'app/ghost'
 require 'app/ghost_controllers'
 require 'app/world'
+require 'app/hud'
 require 'app/renderer'
 require 'app/audio/beat_clock'
 require 'app/level_config'
@@ -709,6 +710,7 @@ class Game
     {
       score: @score,
       lives: @lives,
+      ammo: @player&.ammo,
       completion: @pellets.completion_by_color,
       meter_flash: @meter_flash,
       enrage_step: enrage_step_by_color,
@@ -718,14 +720,14 @@ class Game
   end
 
   def enrage_step_by_color
-    Renderer::HUD_METER_COLORS.to_h do |color|
+    Hud::METER_COLORS.to_h do |color|
       g = @ghosts.find { |gh| gh.identity == Territory.owner_of(color) }
       [color, g ? g.enrage_step : :off]
     end
   end
 
   def pacified_by_color
-    Renderer::HUD_METER_COLORS.to_h do |color|
+    Hud::METER_COLORS.to_h do |color|
       g = @ghosts.find { |gh| gh.identity == Territory.owner_of(color) }
       [color, g ? g.imprisoned? : false]
     end
