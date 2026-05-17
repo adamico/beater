@@ -33,6 +33,7 @@ module Audio
       )
 
       @duck            = DuckController.new
+      @mute            = TRACKS.each_with_object({}) { |t, h| h[t] = false }
       @backend_mode    = NativeBridge.backend_mode
 
       NativeBridge.load_stems(@definitions) if @backend_mode == :native
@@ -54,6 +55,15 @@ module Audio
 
     def using_native_backend?
       @backend_mode == :native
+    end
+
+    # Per-track mute applied as gain multiplier (0.0 silenced, 1.0 audible).
+    # Stems keep streaming so all four share one timeline — pausing breaks
+    # phase alignment because each stream resumes from its own held position
+    # (see ADR-0015).
+    def set_mute(track, muted)
+      return unless TRACKS.include?(track)
+      @mute[track] = muted ? true : false
     end
 
     def set_dot_totals(totals)
@@ -175,9 +185,10 @@ module Audio
       music_bus = GameSettings.music_gain
       TRACKS.each do |n|
         cutoff_hz, gain = @progression.params(n)
+        mute_mult = @mute[n] ? 0.0 : 1.0
         @players[n].apply_mix_settings(
           args,
-          gain: gain * music_bus,
+          gain: gain * music_bus * mute_mult,
           cutoff_hz: cutoff_hz,
           resonance: nil,
           duck_multiplier: duck_gain_multiplier,

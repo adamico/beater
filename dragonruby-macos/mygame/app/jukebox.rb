@@ -141,7 +141,6 @@ module ProgressionTester
     # TT3: tracks start muted so the jukebox opens silent — unmute or solo
     # to audition each stem on demand.
     args.state.pt_muted      = { drums: true, bass: true, lead: true, chords: true }
-    args.state.pt_gain_override = { drums: 1.0, bass: 1.0, lead: 1.0, chords: 1.0 }
     args.state.pt_dragging   = nil          # track being dragged
     args.state.pt_drag_start = nil          # [mouse_y, completion_at_start]
     args.state.pt_meter      = { drums: 0.0, bass: 0.0, lead: 0.0, chords: 0.0 }
@@ -297,23 +296,20 @@ module ProgressionTester
       audio.completion[track] = args.state.pt_completion[track]
     end
 
-    audio.tick(args)
-
-    # Apply mute/solo via the `paused` flag, not by zeroing gain. With the
-    # native audio backend (audio_stem_fx.dylib) the gain we'd write into
-    # args.audio[key].gain is ignored — gain is pushed through
-    # NativeBridge.push_track_params from sync_gains every tick. Pausing
-    # is engine-level and respected by both legacy and native backends.
+    # Mute/solo as gain multiplier, applied during sync_gains. All four
+    # stems keep streaming so they share one timeline — pausing would let
+    # each stream resume from its own held position, breaking phase on
+    # first unmute (see ADR-0015). Apply BEFORE audio.tick so sync_gains
+    # sees the right mute state this frame.
     TRACK_ORDER.each do |track|
-      key = :"track_#{track}"
-      next unless args.audio[key]
-
       # DAW convention: solo overrides mute on the soloed track. While
       # any track is soloed, only that one plays — mute state on the
       # soloed track is ignored. Otherwise per-track mute decides.
       silenced = solo ? (solo != track) : muted[track]
-      args.audio[key].paused = silenced
+      audio.set_mute(track, silenced)
     end
+
+    audio.tick(args)
 
     # Decay meter values toward current completion (VU meter feel)
     TRACK_ORDER.each do |track|
