@@ -711,8 +711,24 @@ class Game
       lives: @lives,
       completion: @pellets.completion_by_color,
       meter_flash: @meter_flash,
+      enrage_step: enrage_step_by_color,
+      pacified: pacified_by_color,
       beat_phase: beats - beats.floor
     }
+  end
+
+  def enrage_step_by_color
+    Renderer::HUD_METER_COLORS.to_h do |color|
+      g = @ghosts.find { |gh| gh.identity == Territory.owner_of(color) }
+      [color, g ? g.enrage_step : :off]
+    end
+  end
+
+  def pacified_by_color
+    Renderer::HUD_METER_COLORS.to_h do |color|
+      g = @ghosts.find { |gh| gh.identity == Territory.owner_of(color) }
+      [color, g ? g.imprisoned? : false]
+    end
   end
 
   def pause_pressed?

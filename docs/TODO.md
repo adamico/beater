@@ -3,7 +3,6 @@
 ## Bugs & Tweaks
 
 ## Visuals
-- V1: ghosts animated sprites (idle, move, frightened, eaten)
 - add player ghost trail like vampire survivors
 - improve hit feedback (ghosts, player, dots)
 - rhythm hint in ghost sprites (pulse, glow)

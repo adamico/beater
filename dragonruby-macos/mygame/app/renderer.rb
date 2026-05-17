@@ -9,69 +9,83 @@
 # primitive. HUD lives directly in SCREEN space, untouched by the camera.
 
 class Renderer
-  BACKGROUND      = [30, 30, 30].freeze
-  WALL_COLOR      = { r: 255, g: 255, b: 255 }.freeze
+  BACKGROUND        = [30, 30, 30].freeze
+  WALL_COLOR        = { r: 255, g: 255, b: 255 }.freeze
   PELLET_COLOR_BY_KEY = {
     red: { r: 255, g: 90, b: 90 },
     green: { r: 90, g: 230, b: 120 },
     blue: { r: 90, g: 160, b: 255 },
     yellow: { r: 255, g: 225, b: 90 }
   }.freeze
-  PELLET_COLOR_FALLBACK = { r: 255, g: 200, b: 150 }.freeze
-  POPUP_COLOR = { r: 100, g: 220, b: 255 }.freeze
+  POPUP_COLOR       = { r: 100, g: 220, b: 255 }.freeze
   # G1: track-completion popup + meter-flash tint.
   TRACK_POPUP_COLOR = { r: 255, g: 225, b: 90 }.freeze
   METER_FLASH_COLOR = { r: 255, g: 255, b: 255 }.freeze
   METER_FLASH_TICKS = 24
-  CLIP_BACKGROUND = [0, 0, 0, 0].freeze
+  CLIP_BACKGROUND   = [0, 0, 0, 0].freeze
 
   # Pellet sizes as a fraction of the cell, so they never drift when CELL_SIZE
   # changes (ADR-0008). Territory dots upsized from 0.2 so the per-territory
   # shape (UI3a) is legible; power pellets keep the original 16/20 ratio.
-  PELLET_SIZE_RATIO       = 1.0
-  POWER_PELLET_SIZE_RATIO = 1.2
+  PELLET_SIZE_RATIO  = 1.0
+  POWER_PELLET_RATIO = 1.2
 
   # UI3a: distinct musical-accidental shape per territory (♭ ♯ ♮ 𝄪) as the
   # non-colour identity channel for ADR-0010. Frame order matches the sheet.
   PELLET_SPRITE_PATH  = 'sprites/dots.png'.freeze
   PELLET_SPRITE_TILE  = 48
-  PELLET_SPRITE_FRAME = { red: 0, green: 1, blue: 2, yellow: 3 }.freeze
-  POWER_PELLET_SPRITE_FRAME = 4
+  NORMAL_PELLET_FRAME = { red: 0, green: 1, blue: 2, yellow: 3 }.freeze
+  POWER_PELLET_FRAME  = 4
 
-  HUD_AMMO_ICON_SIZE = 32
-  HUD_AMMO_ICON_GAP  = 4
-  HUD_AMMO_ICON_MAX_VISIBLE = 5
-  HUD_AMMO_PATH = 'sprites/bullet.png'
+  HUD_AMMO_ICON_SIZE  = 32
+  HUD_AMMO_ICON_GAP   = 4
+  HUD_AMMO_ICON_MAX   = 5
+  HUD_AMMO_PATH       = 'sprites/bullet.png'
   HUD_AMMO_PLUS_COLOR = { r: 255, g: 220, b: 110 }.freeze
   # Fixed screen-space anchor (bottom-left corner), unaffected by the camera.
-  HUD_AMMO_MARGIN_X = 20
-  HUD_AMMO_MARGIN_Y = 20
-
-  HUD_TEXT_COLOR   = { r: 255, g: 255, b: 255 }.freeze
-  HUD_DIM_COLOR    = { r: 200, g: 200, b: 200 }.freeze
+  HUD_AMMO_MARGIN_X   = 20
+  HUD_AMMO_MARGIN_Y   = 20
+  HUD_TEXT_COLOR      = { r: 255, g: 255, b: 255 }.freeze
+  HUD_DIM_COLOR       = { r: 200, g: 200, b: 200 }.freeze
   # Lives: row of small player-sprite icons, top-right.
-  HUD_LIFE_ICON_W  = 32
-  HUD_LIFE_ICON_H  = 48
-  HUD_LIFE_GAP     = 6
-  HUD_LIFE_Y       = 660
-  # Track completion: 4 colored meters across the top centre.
-  HUD_METER_W      = 110
-  HUD_METER_H      = 12
-  HUD_METER_GAP    = 12
-  HUD_METER_Y      = 698
-  HUD_METER_BG     = { r: 55, g: 55, b: 55 }.freeze
-  HUD_METER_COLORS = %i[red green blue yellow].freeze
+  HUD_LIFE_ICON_W     = 32
+  HUD_LIFE_ICON_H     = 48
+  HUD_LIFE_GAP        = 6
+  HUD_LIFE_Y          = 660
+  # Enrage gauges: 4 colored meters across the top centre, each preceded by a
+  # 32x32 ghost-identity icon. Bar fill = territory clearance %; icon carries
+  # the discrete enrage step + pacify state (UI3).
+  HUD_METER_W         = 110
+  HUD_METER_H         = 12
+  HUD_METER_GAP       = 12
+  HUD_METER_Y         = 698
+  HUD_METER_BG        = { r: 55, g: 55, b: 55 }.freeze
+  HUD_METER_COLORS    = %i[red green blue yellow].freeze
+  HUD_GAUGE_ICON_SIZE = 32
+  HUD_GAUGE_ICON_GAP  = 6
+  HUD_GAUGE_MARGIN_Y  = HUD_GAUGE_ICON_SIZE / 2 + 8
+  HUD_GAUGE_ICON_Y    = HUD_METER_Y + HUD_METER_H / 2 - HUD_GAUGE_MARGIN_Y
+  HUD_GAUGE_ICON_PATHS = {
+    red: 'sprites/bass_blinky_icon.png',
+    green: 'sprites/drums_pinky_icon.png',
+    blue: 'sprites/chords_clyde_icon.png',
+    yellow: 'sprites/lead_inky_icon.png'
+  }.freeze
+  HUD_ENRAGE1_TINT    = { r: 255, g: 80,  b: 80,  a: 60  }.freeze
+  HUD_ENRAGE2_TINT    = { r: 255, g: 30,  b: 30,  a: 120 }.freeze
+  HUD_ENRAGE2_PULSE_A = 30
+  HUD_PACIFY_ALPHA    = 60
 
   # Beat pulse — a small square that pops bright+large on the downbeat and
   # decays to a dim minimum just before the next beat. Centred above the
   # track meters. Driven by hud[:beat_phase] (0..1 across one beat).
-  HUD_BEAT_X       = Camera::SCREEN_W / 2
-  HUD_BEAT_Y       = 684
-  HUD_BEAT_R_MIN   = 3
-  HUD_BEAT_R_MAX   = 9
-  HUD_BEAT_COLOR   = { r: 255, g: 230, b: 100 }.freeze
-  HUD_BEAT_ALPHA_MIN = 80
-  HUD_BEAT_ALPHA_MAX = 255
+  HUD_BEAT_X          = Camera::SCREEN_W / 2
+  HUD_BEAT_Y          = 684
+  HUD_BEAT_R_MIN      = 3
+  HUD_BEAT_R_MAX      = 9
+  HUD_BEAT_COLOR      = { r: 255, g: 230, b: 100 }.freeze
+  HUD_BEAT_ALPHA_MIN  = 80
+  HUD_BEAT_ALPHA_MAX  = 255
 
   def initialize(projection)
     @projection = projection
@@ -96,11 +110,13 @@ class Renderer
   def draw_hud(outputs, player, hud)
     draw_hud_ammo(outputs, player) if player
     outputs.labels << {
-      x: HUD_AMMO_MARGIN_X, y: 706,
-      text: "SCORE #{hud[:score]}", size_enum: 4, **HUD_TEXT_COLOR
+      x: HUD_AMMO_MARGIN_X,
+      y: HUD_GAUGE_ICON_Y,
+      text: "SCORE #{hud[:score]}", size_enum: 4, **HUD_TEXT_COLOR,
+      alignment_enum: 0, vertical_alignment_enum: 1
     }
     draw_hud_lives(outputs, hud[:lives])
-    draw_hud_meters(outputs, hud[:completion], hud[:meter_flash])
+    draw_hud_meters(outputs, hud[:completion], hud[:meter_flash], hud[:enrage_step], hud[:pacified], hud[:beat_phase])
     draw_hud_beat_pulse(outputs, hud[:beat_phase]) if hud[:beat_phase]
   end
 
@@ -131,33 +147,68 @@ class Renderer
     outputs.sprites << sprites
   end
 
-  def draw_hud_meters(outputs, completion, meter_flash = nil)
+  def draw_hud_meters(outputs, completion, meter_flash = nil, enrage_step = nil, pacified = nil, beat_phase = nil)
     return unless completion
 
     meter_flash ||= {}
-    total_w = HUD_METER_COLORS.size * HUD_METER_W +
-              (HUD_METER_COLORS.size - 1) * HUD_METER_GAP
+    enrage_step ||= {}
+    pacified    ||= {}
+    slot_w = HUD_GAUGE_ICON_SIZE + HUD_GAUGE_ICON_GAP + HUD_METER_W
+    total_w = HUD_METER_COLORS.size * slot_w + (HUD_METER_COLORS.size - 1) * HUD_METER_GAP
     start_x = (Camera::SCREEN_W - total_w) / 2
     solids = []
+    sprites = []
     HUD_METER_COLORS.each_with_index do |color, i|
-      x = start_x + i * (HUD_METER_W + HUD_METER_GAP)
+      slot_x = start_x + i * (slot_w + HUD_METER_GAP)
+      icon_x = slot_x
+      bar_x  = slot_x + HUD_GAUGE_ICON_SIZE + HUD_GAUGE_ICON_GAP
       ratio = (completion[color] || 0.0).clamp(0.0, 1.0)
-      solids << { x: x, y: HUD_METER_Y, w: HUD_METER_W, h: HUD_METER_H, **HUD_METER_BG }
-      solids << {
-        x: x, y: HUD_METER_Y, w: (HUD_METER_W * ratio).round, h: HUD_METER_H,
-        **(PELLET_COLOR_BY_KEY[color] || PELLET_COLOR_FALLBACK)
-      }
-      # G1: white overlay over the full bar, fading out over the flash window.
-      flash = meter_flash[color].to_i
-      next if flash <= 0
 
+      solids << { x: bar_x, y: HUD_METER_Y, w: HUD_METER_W, h: HUD_METER_H, **HUD_METER_BG }
       solids << {
-        x: x, y: HUD_METER_Y, w: HUD_METER_W, h: HUD_METER_H,
-        **METER_FLASH_COLOR,
-        a: (flash.to_f / METER_FLASH_TICKS * 255).to_i
+        x: bar_x, y: HUD_METER_Y, w: (HUD_METER_W * ratio).round, h: HUD_METER_H,
+        **PELLET_COLOR_BY_KEY[color]
       }
+      flash = meter_flash[color].to_i
+      if flash > 0
+        solids << {
+          x: bar_x, y: HUD_METER_Y, w: HUD_METER_W, h: HUD_METER_H,
+          **METER_FLASH_COLOR,
+          a: (flash.to_f / METER_FLASH_TICKS * 255).to_i
+        }
+      end
+
+      draw_hud_gauge_icon(sprites, solids, color, icon_x, enrage_step[color], pacified[color], beat_phase)
     end
     outputs.solids << solids
+    outputs.sprites << sprites
+  end
+
+  def draw_hud_gauge_icon(sprites, solids, color, x, step, is_pacified, beat_phase)
+    path = HUD_GAUGE_ICON_PATHS[color]
+    return unless path
+
+    icon_alpha = is_pacified ? HUD_PACIFY_ALPHA : 255
+    sprites << {
+      x: x, y: HUD_GAUGE_ICON_Y, w: HUD_GAUGE_ICON_SIZE, h: HUD_GAUGE_ICON_SIZE,
+      path: path, a: icon_alpha
+    }
+    return if is_pacified
+
+    case step
+    when :enrage1
+      solids << {
+        x: x, y: HUD_GAUGE_ICON_Y, w: HUD_GAUGE_ICON_SIZE, h: HUD_GAUGE_ICON_SIZE,
+        **HUD_ENRAGE1_TINT
+      }
+    when :enrage2
+      pulse = beat_phase ? ((1.0 - beat_phase.clamp(0.0, 1.0)) * HUD_ENRAGE2_PULSE_A).to_i : 0
+      solids << {
+        x: x, y: HUD_GAUGE_ICON_Y, w: HUD_GAUGE_ICON_SIZE, h: HUD_GAUGE_ICON_SIZE,
+        r: HUD_ENRAGE2_TINT[:r], g: HUD_ENRAGE2_TINT[:g], b: HUD_ENRAGE2_TINT[:b],
+        a: HUD_ENRAGE2_TINT[:a] + pulse
+      }
+    end
   end
 
   # Centred banner for the non-playing states.
@@ -228,7 +279,7 @@ class Renderer
     sprites = []
     cell = @projection.cell_size
     pellet_size = (cell * PELLET_SIZE_RATIO).round
-    power_size = (cell * POWER_PELLET_SIZE_RATIO).round
+    power_size = (cell * POWER_PELLET_RATIO).round
     pellets.each_with_color do |(gx, gy), kind, color|
       rect = @projection.cell_rect(gx, gy)
       if kind == :power
@@ -237,12 +288,12 @@ class Renderer
                          x: rect[:x] + pad, y: rect[:y] + pad,
                          w: power_size, h: power_size,
                          path: PELLET_SPRITE_PATH,
-                         tile_x: POWER_PELLET_SPRITE_FRAME * PELLET_SPRITE_TILE, tile_y: 0,
+                         tile_x: POWER_PELLET_FRAME * PELLET_SPRITE_TILE, tile_y: 0,
                          tile_w: PELLET_SPRITE_TILE, tile_h: PELLET_SPRITE_TILE
                        ))
       else
         pad = (cell - pellet_size) / 2
-        frame = PELLET_SPRITE_FRAME[color] || 0
+        frame = NORMAL_PELLET_FRAME[color] || 0
         sprites.concat(project(
                          x: rect[:x] + pad, y: rect[:y] + pad,
                          w: pellet_size, h: pellet_size,
@@ -269,7 +320,7 @@ class Renderer
     return unless player.respond_to?(:ammo)
 
     ammo = player.ammo
-    visible = [ammo, HUD_AMMO_ICON_MAX_VISIBLE].min
+    visible = [ammo, HUD_AMMO_ICON_MAX].min
     base_x = HUD_AMMO_MARGIN_X
     base_y = HUD_AMMO_MARGIN_Y
 
@@ -284,7 +335,7 @@ class Renderer
     end
     outputs.sprites << sprites
 
-    return unless ammo > HUD_AMMO_ICON_MAX_VISIBLE
+    return unless ammo > HUD_AMMO_ICON_MAX
 
     plus_x = base_x + visible * (HUD_AMMO_ICON_SIZE + HUD_AMMO_ICON_GAP)
     outputs.labels << {
