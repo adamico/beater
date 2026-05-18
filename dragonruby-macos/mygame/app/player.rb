@@ -1,13 +1,13 @@
 # app/player.rb
-require 'app/direction.rb'
-require 'app/grid_mover.rb'
-require 'app/audio/beat_clock.rb'
+require 'app/direction'
+require 'app/grid_mover'
+require 'app/audio/beat_clock'
 
 class Player
   include GridMover
 
-  PLAYER_SPRITE_PATH = "sprites/player.png"
-  PLAYER_SPRITE_WIDTH = 64
+  PLAYER_SPRITE_PATH = 'sprites/player.png'
+  PLAYER_SPRITE_WIDTH = 96
   PLAYER_SPRITE_HEIGHT = 96
 
   attr_accessor :controller
@@ -51,6 +51,7 @@ class Player
 
   def consume_ammo!
     return false if @ammo <= 0
+
     @ammo -= 1
     true
   end
@@ -84,9 +85,9 @@ class Player
     @death_ticks = nil
   end
 
-  WALK_FRAME_START = 3
-  WALK_FRAME_COUNT = 8
-  TICKS_PER_WALK_FRAME = 4
+  WALK_FRAME_START = 0
+  WALK_FRAME_COUNT = 10
+  TICKS_PER_WALK_FRAME = 3
 
   # Px per tick the rendered sprite catches up to the logical position
   # after a corner snap. Lower = more visible diagonal slide; higher = closer
@@ -119,7 +120,8 @@ class Player
   # absorbed as a visual offset that decays over a few frames. The hitbox
   # and dot-collection use the logical position; only rendering trails.
   def try_turn(direction, maze, projection)
-    pre_x, pre_y = @x, @y
+    pre_x = @x
+    pre_y = @y
     result = super
     if result
       @visual_offset_x -= (@x - pre_x)
@@ -135,6 +137,7 @@ class Player
 
   def decay_toward_zero(value, step)
     return 0.0 if value.abs <= step
+
     value > 0 ? value - step : value + step
   end
 
@@ -144,17 +147,20 @@ class Player
   # path until aligned. Replaces the perpendicular snap that ghosts use.
   def apply_corner_phase(projection)
     return if @direction.none?
+
     cs = projection.cell_size
     if @direction.vertical?
       target = ((@x - projection.offset_x) / cs).round * cs + projection.offset_x
       delta = target - @x
       return if delta.abs <= AXIS_SNAP_EPSILON
+
       step = [@speed.to_f, delta.abs].min
       @x += delta.positive? ? step : -step
     elsif @direction.horizontal?
       target = ((@y - projection.offset_y) / cs).round * cs + projection.offset_y
       delta = target - @y
       return if delta.abs <= AXIS_SNAP_EPSILON
+
       step = [@speed.to_f, delta.abs].min
       @y += delta.positive? ? step : -step
     end
@@ -220,13 +226,13 @@ class Player
       tile_x: tile_index * PLAYER_SPRITE_WIDTH,
       tile_y: 0,
       tile_w: PLAYER_SPRITE_WIDTH,
-      tile_h: PLAYER_SPRITE_HEIGHT,
+      tile_h: PLAYER_SPRITE_HEIGHT
     }
     case @direction
-      when Direction::LEFT then base.merge(flip_horizontally: true)
-      when Direction::UP   then base.merge(angle: 90)
-      when Direction::DOWN then base.merge(angle: 90, flip_horizontally: true)
-      else base
+    when Direction::LEFT then base.merge(flip_horizontally: true)
+    when Direction::UP   then base.merge(angle: 90)
+    when Direction::DOWN then base.merge(angle: 90, flip_horizontally: true)
+    else base
     end
   end
 
@@ -249,7 +255,8 @@ class Player
   end
 
   def advance(maze, projection)
-    pre_x, pre_y = @x, @y
+    pre_x = @x
+    pre_y = @y
     super
     moved = (@x - pre_x).abs > AXIS_SNAP_EPSILON || (@y - pre_y).abs > AXIS_SNAP_EPSILON
     @walk_ticks += 1 if moved
@@ -266,6 +273,7 @@ class Player
 
   def apply_dot_slow
     return if @dot_slow_remaining_ticks <= 0
+
     @speed *= DOT_SLOW_FACTOR
     @dot_slow_remaining_ticks -= 1
   end

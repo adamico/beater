@@ -3,10 +3,6 @@
 ## Bugs & Tweaks
 
 ## Visuals
-- add player ghost trail like vampire survivors
-- improve hit feedback (ghosts, player, dots)
-- rhythm hint in ghost sprites (pulse, glow)
-- proper level graphics in place of bland white walls
 
 ## Audio
 
@@ -16,28 +12,41 @@
 
 ## tests & tools
 
-- TT1: add cheat shorcuts (no collision with ghosts, infinite lives, infinite ammo, no clip to walls) for easier testing of later levels and mechanics
-
 # Polish after MVP
 
 ## Visual
-- shaders
-- particles
-
+- improve ghosts movement animation (bobbing, eyes looking in movement direction)
+- add player ghost trail like vampire survivors
+- improve hit feedback (ghosts, player, dots)
+- add screen shake on player hit
+- add particles for:
+  - dot collection
+  - ghost hits
+  - player shooting
+- add light effects for player shooting
+- rhythm hint in ghost sprites (pulse, glow)
+- proper level graphics in place of bland white walls
+- 
 ## UI
 
 ## Audio
 
 - rethink to introduce complexification of music tracks with dot track completion. this would need at least 3 variations of each track (base, mid, full) and a way to transition between them smoothly, the beat must be synced.
+- add filter knobs to the jukebox (filter type, cutoff, resonance) for more DJing fun
+- add beat repeat and stutter effects to the jukebox for more rhythmic fun
+- add quantized beat start/stop when muting/unmuting tracks in the jukebox to keep everything in sync
+- add reverse playback option
+- add oscilloscope visualizer for the music tracks in the jukebox for extra flair
 
 ## Gameplay
 
 - G5: bonus score collectables or other collectables?
 
-## tests & refactor
+## tests & tools & refactor
 
-- improve the maze layout code to be more data-driven and less hardcoded, maybe with a visual editor
-- add a level difficulty curve editor to tweak enemy behavior, spawn rates, and other parameters across levels
+- TTR1: add cheat shorcuts (no collision with ghosts, infinite lives, infinite ammo, no clip to walls) for easier testing of later levels and mechanics
+- TTR2: improve the maze layout code to be more data-driven and less hardcoded, maybe with a visual editor
+- TTR3: add a level difficulty curve editor to tweak enemy behavior, spawn rates, and other parameters across levels
 
 # Future ideas
 

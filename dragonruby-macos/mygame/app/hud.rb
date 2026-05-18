@@ -25,7 +25,7 @@ module Hud
   AMMO_MARGIN_Y   = 20
 
   # Lives — row of player-sprite icons, top-right.
-  LIFE_ICON_W = 32
+  LIFE_ICON_W = 48
   LIFE_ICON_H = 48
   LIFE_GAP    = 6
 
@@ -38,18 +38,18 @@ module Hud
   METER_FLASH_COLOR = { r: 255, g: 255, b: 255 }.freeze
   METER_FLASH_TICKS = 24
   PELLET_COLOR_BY_KEY = {
-    red:    { r: 255, g: 90,  b: 90 },
-    green:  { r: 90,  g: 230, b: 120 },
-    blue:   { r: 90,  g: 160, b: 255 },
+    red: { r: 255, g: 90, b: 90 },
+    green: { r: 90, g: 230, b: 120 },
+    blue: { r: 90, g: 160, b: 255 },
     yellow: { r: 255, g: 225, b: 90 }
   }.freeze
 
   GAUGE_ICON_SIZE = 32
   GAUGE_ICON_GAP  = 6
   GAUGE_ICON_PATHS = {
-    red:    'sprites/bass_blinky_icon.png',
-    green:  'sprites/drums_pinky_icon.png',
-    blue:   'sprites/chords_clyde_icon.png',
+    red: 'sprites/bass_blinky_icon.png',
+    green: 'sprites/drums_pinky_icon.png',
+    blue: 'sprites/chords_clyde_icon.png',
     yellow: 'sprites/lead_inky_icon.png'
   }.freeze
   ENRAGE1_TINT    = { r: 255, g: 80, b: 80, a: 60  }.freeze
