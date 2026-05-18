@@ -874,9 +874,23 @@ class Game
   end
 
   def tick_projectiles
-    @projectiles.each { |p| p.tick(@maze, @projection) }
+    @projectiles.each do |p|
+      was_alive = !p.dead?
+      p.tick(@maze, @projection)
+      spawn_wall_hit_particles(p) if was_alive && p.dead? # ADR-0018
+    end
     resolve_projectile_hits
     @projectiles.reject!(&:dead?)
+  end
+
+  def spawn_wall_hit_particles(p)
+    r = p.rect
+    @particles.burst(
+      world_x: r[:x] + r[:w] / 2.0,
+      world_y: r[:y] + r[:h] / 2.0,
+      color_rgb: { r: 90, g: 230, b: 120 },
+      count: 10, lifetime: 16, size: 8
+    )
   end
 
   def fire_projectile
@@ -885,6 +899,10 @@ class Game
     @projectiles << Projectile.new(
       cx: cx, cy: cy, direction: @player.direction,
       speed: PROJECTILE_SPEED, size: PROJECTILE_SIZE
+    )
+    @particles.muzzle_burst( # ADR-0018
+      world_x: cx, world_y: cy,
+      dir_dx: @player.direction.dx, dir_dy: @player.direction.dy
     )
   end
 
@@ -896,6 +914,7 @@ class Game
         next if g.imprisoned? || g.state == :in_house || g.state == :eaten || g.state == :imprisoning
         next unless rects_overlap?(p.collision_rect, g.rect)
 
+        spawn_bullet_absorb_particles(g) # ADR-0018
         apply_bullet_to(g)
         p.kill! # ADR-0011: bullets are always consumed on contact
         break
@@ -907,6 +926,16 @@ class Game
   # :enrage1 needs 2 (1st partial → flash + metallic clank, 2nd kills),
   # :enrage2 is immune (every hit flashes + plays the heavier metallic SFX,
   # never kills). Bullet always consumed by the caller.
+  def spawn_bullet_absorb_particles(g)
+    r = g.rect
+    @particles.burst(
+      world_x: r[:x] + r[:w] / 2.0,
+      world_y: r[:y] + r[:h] / 2.0,
+      color_rgb: { r: 90, g: 230, b: 120 },
+      count: 10, lifetime: 16, size: 8
+    )
+  end
+
   def apply_bullet_to(g)
     if g.enrage_step == :enrage2
       g.armor_flash!
@@ -946,7 +975,7 @@ class Game
 
       g.enrage_step = enrage_for(g)
 
-      next if g.state == :eaten || g.state == :imprisoning # transit speed is FSM-owned
+      next if %i[eaten imprisoning].include?(g.state) # transit speed is FSM-owned
 
       g.speed = effective_ghost_speed(g)
     end

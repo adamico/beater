@@ -39,8 +39,8 @@ class Renderer
     outputs.background_color = BACKGROUND
     draw_world(outputs, maze)
     draw_pellets(outputs, pellets)
-    draw_particles(outputs, particles) if particles # ADR-0018 (above actors, below HUD)
     draw_actors(outputs, player, ghosts, projectiles)
+    draw_particles(outputs, particles) if particles # ADR-0018 (above actors, below HUD)
     draw_hud(outputs, hud) if hud && state != :game_over
     draw_popup(outputs, popup) if popup
     track_popups.each { |p| draw_popup(outputs, p, color: TRACK_POPUP_COLOR) }

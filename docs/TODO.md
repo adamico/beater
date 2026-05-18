@@ -15,11 +15,6 @@
 # Polish after MVP
 
 ## Visual
-- add particles for:
-  - ~~dot collection~~ (ADR-0018)
-  - ghost hits
-  - player shooting
-- add light effects for player shooting
 
 - proper level graphics in place of bland white walls
 

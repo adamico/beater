@@ -21,7 +21,7 @@ class Particles
 
   # Spawn a colour burst centred on (world_x, world_y). `color_rgb` is a
   # `{ r:, g:, b: }` hash — Renderer reads it straight as a solid.
-  def burst(world_x:, world_y:, color_rgb:, count: DOT_BURST_COUNT, lifetime: DOT_LIFETIME)
+  def burst(world_x:, world_y:, color_rgb:, count: DOT_BURST_COUNT, lifetime: DOT_LIFETIME, size: DOT_SIZE_PX)
     count.times do
       angle = rand * Math::PI * 2.0
       speed = DOT_SPEED_MIN + rand * (DOT_SPEED_MAX - DOT_SPEED_MIN)
@@ -31,7 +31,7 @@ class Particles
         vy: Math.sin(angle) * speed,
         life: lifetime,
         life_total: lifetime,
-        size: DOT_SIZE_PX,
+        size: size,
         r: color_rgb[:r], g: color_rgb[:g], b: color_rgb[:b]
       }
     end
@@ -43,6 +43,34 @@ class Particles
     burst(world_x: world_x, world_y: world_y,
           color_rgb: { r: 255, g: 255, b: 255 },
           count: DOT_BURST_POWER, lifetime: DOT_LIFETIME)
+  end
+
+  MUZZLE_COUNT     = 14
+  MUZZLE_LIFETIME  = 14
+  MUZZLE_SIZE_PX   = 12
+  MUZZLE_SPEED_MIN = 5.0
+  MUZZLE_SPEED_MAX = 11.0
+  MUZZLE_SPREAD    = Math::PI / 5.0 # ±36deg cone
+  MUZZLE_RGB       = { r: 255, g: 230, b: 140 }.freeze
+
+  # Directional cone for player shooting. Particles spray along
+  # (dir_dx, dir_dy) with a ±MUZZLE_SPREAD jitter; warm muzzle-flash colour.
+  def muzzle_burst(world_x:, world_y:, dir_dx:, dir_dy:)
+    base_angle = Math.atan2(dir_dy, dir_dx)
+    MUZZLE_COUNT.times do
+      angle = base_angle + (rand * 2.0 - 1.0) * MUZZLE_SPREAD
+      speed = MUZZLE_SPEED_MIN + rand * (MUZZLE_SPEED_MAX - MUZZLE_SPEED_MIN)
+      @list << {
+        x: world_x, y: world_y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: MUZZLE_LIFETIME,
+        life_total: MUZZLE_LIFETIME,
+        size: MUZZLE_SIZE_PX,
+        r: MUZZLE_RGB[:r], g: MUZZLE_RGB[:g], b: MUZZLE_RGB[:b]
+      }
+    end
+    drop_overflow
   end
 
   # Advance one frame. Called only from tick_playing — frozen in
