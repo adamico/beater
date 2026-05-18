@@ -7,7 +7,7 @@ devid=kc00l
 devtitle=Fifth Layer Studio
 gameid=beat2r
 gametitle=Beat2R
-version=0.1.0
+version=1.0.1
 icon=metadata/icon.png
 
 # ==============================================

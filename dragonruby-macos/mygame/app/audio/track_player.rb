@@ -36,7 +36,14 @@ module Audio
     def apply_legacy_mix(args, final_gain)
       return if @last_output_gain && (@last_output_gain - final_gain).abs <= 0.001
 
-      args.audio[@track_key]&.tap { |a| a.gain = final_gain }
+      # Bracket form works on both the macOS struct wrapper and the HTML5
+      # plain-Hash returned by args.audio[key]. The `.gain=` setter is
+      # macOS-only and silently fails on wasm, freezing progression.
+      entry = args.audio[@track_key]
+      if entry
+        entry[:gain] = final_gain
+        entry.gain = final_gain if entry.respond_to?(:gain=)
+      end
       @last_output_gain = final_gain
     end
 
