@@ -28,6 +28,14 @@ class Camera
   DYING_EASE_MIN_FRAMES   = 24.0
   DYING_EASE_MAX_FRAMES   = 90.0
 
+  # Screen-shake (ADR-0017). Render-only camera nudge fired on the
+  # `playing -> dying` edge. Trauma decays linearly, offset scales with
+  # trauma**2 so the punch front-loads. Applied post-clamp in to_screen /
+  # screen_xs, so HUD (screen-space) stays still and a few px of void may
+  # peek at maze Y-extremes — accepted as cheap polish.
+  SHAKE_DEFAULT_TICKS = 24
+  SHAKE_MAX_AMP_PX    = 8.0
+
   attr_reader :zoom, :dying_ease_duration
 
   def initialize(world_w:, world_h:, cell_size:, zoom: 1.0)
@@ -39,6 +47,48 @@ class Camera
     @cy = world_h / 2.0
     @offset_x = 0.0
     @offset_y = 0.0
+    @shake_ticks = 0
+    @shake_ticks_total = 0
+    @shake_trauma = 0.0
+    @shake_dx = 0.0
+    @shake_dy = 0.0
+  end
+
+  # Begin a screen-shake. No-op when REDUCED FLASH is on (full skip).
+  # Edge-triggered: callers fire it once on the trigger frame.
+  def shake!(trauma: 1.0, ticks: SHAKE_DEFAULT_TICKS)
+    return if GameSettings.get(:reduced_flash)
+
+    @shake_trauma = trauma
+    @shake_ticks = ticks
+    @shake_ticks_total = ticks
+  end
+
+  # Advance the shake one frame. Called by Game only in active states
+  # (tick_playing / tick_dying) so the shake freezes with the world on
+  # pause, matching ADR-0013.
+  def tick_shake
+    if @shake_ticks <= 0
+      @shake_dx = 0.0
+      @shake_dy = 0.0
+      return
+    end
+
+    t = @shake_ticks / @shake_ticks_total.to_f
+    intensity = @shake_trauma * t * t
+    @shake_dx = SHAKE_MAX_AMP_PX * intensity * (rand * 2.0 - 1.0)
+    @shake_dy = SHAKE_MAX_AMP_PX * intensity * (rand * 2.0 - 1.0)
+    @shake_ticks -= 1
+  end
+
+  def clear_shake!
+    @shake_ticks = 0
+    @shake_dx = 0.0
+    @shake_dy = 0.0
+  end
+
+  def shaking?
+    @shake_ticks > 0
   end
 
   # Point the camera at the player. Called by Game after player movement,
@@ -113,14 +163,14 @@ class Camera
   # World point -> screen point. X is not seam-folded here; primitive callers
   # use #screen_xs, the world_target blit folds via #view_rect.
   def to_screen(wx, wy)
-    [(wx - left) * @zoom, (wy - bottom) * @zoom]
+    [(wx - left) * @zoom + @shake_dx, (wy - bottom) * @zoom + @shake_dy]
   end
 
   # Screen x positions at which a world-space object of width `w_obj` should be
   # drawn: the base position plus, when it straddles the toroidal seam, the
   # +/- world-width copy that lands on screen. The seam choke point.
   def screen_xs(wx, w_obj)
-    base = (wx - left) * @zoom
+    base = (wx - left) * @zoom + @shake_dx
     xs = [base]
     xs << base - @world_w * @zoom if base + w_obj * @zoom > SCREEN_W
     xs << base + @world_w * @zoom if base < 0

@@ -15,16 +15,14 @@
 # Polish after MVP
 
 ## Visual
-- improve ghosts movement animation (bobbing, eyes looking in movement direction)
-- add player ghost trail like vampire survivors
-- improve hit feedback (ghosts, player, dots)
-- add screen shake on player hit
+- improve hit feedback (ghosts, player)
+- ~~add screen shake on player hit~~ (ADR-0017)
 - add particles for:
   - dot collection
   - ghost hits
   - player shooting
 - add light effects for player shooting
-- rhythm hint in ghost sprites (pulse, glow)
+
 - proper level graphics in place of bland white walls
 
 ## UI

@@ -390,6 +390,7 @@ class Game
   # music eases in. Routes to game_over when no lives remain.
   def tick_dying
     if @dying_phase == :anim
+      @camera.tick_shake # ADR-0017
       @player.tick_death
       if @player.death_anim_done?
         respawn_actors
@@ -397,6 +398,7 @@ class Game
           enter_game_over
           return
         end
+        @camera.clear_shake! # ADR-0017: don't fight the phase-2 ease
         start_camera_return
         @dying_phase = :camera
       end
@@ -620,6 +622,7 @@ class Game
     @dying_phase = :anim
     @player.begin_death
     @projectiles.clear
+    @camera.shake! # ADR-0017
     args.state.audio.on_player_death(args)
   end
 
