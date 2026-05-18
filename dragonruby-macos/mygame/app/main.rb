@@ -21,6 +21,7 @@ require 'app/scenes/title'
 require 'app/scenes/settings'
 require 'app/scenes/credits'
 require 'app/scenes/instructions'
+require 'app/scenes/sprite_lab'
 require 'app/jukebox'
 
 def boot(_args)
@@ -52,6 +53,9 @@ def tick(args)
   when :instructions
     $instructions ||= Scenes::Instructions.new
     $instructions.tick(args)
+  when :sprite_lab
+    $sprite_lab ||= Scenes::SpriteLab.new
+    $sprite_lab.tick(args)
   when :jukebox
     Jukebox.tick(args)
     SceneDirector.draw_fade(args.outputs) if SceneDirector.transitioning?
@@ -81,6 +85,7 @@ def apply_scene_swap(args)
     $settings = nil
     $credits = nil
     $instructions = nil
+    $sprite_lab = nil
     args.state.jukebox = nil
     Audio::NativeBridge.reset_runtime_state!
     args.state.audio = nil

@@ -10,15 +10,24 @@ module Scenes
     TITLE = 'BEAT2R'
     TAGLINE = 'Maze. Beat. Repeat.'
     CREDITS = 'kc00l @ Fifth Layer Studio 2026'
-    ITEMS = %i[play settings instructions jukebox credits quit].freeze
     LABELS = {
       play: 'PLAY',
       settings: 'SETTINGS',
       instructions: 'INSTRUCTIONS',
       jukebox: 'JUKEBOX',
+      sprite_lab: 'SPRITE LAB',
       credits: 'CREDITS',
       quit: 'QUIT'
     }.freeze
+
+    # Sprite Lab is a dev-only screen, hidden in production builds (see ADR-0016).
+    def items
+      @items ||= begin
+        base = %i[play settings instructions jukebox]
+        base << :sprite_lab unless $gtk.production?
+        base + %i[credits quit]
+      end
+    end
 
     ITEM_W = 280
     ITEM_H = 56
@@ -38,14 +47,15 @@ module Scenes
 
     private
 
-    def item_count = ITEMS.length
+    def item_count = items.length
 
     def on_activate(_args)
-      case ITEMS[@selected]
+      case items[@selected]
       when :play then SceneDirector.request(:playing)
       when :settings then SceneDirector.request(:settings, return_to: :title)
       when :instructions then SceneDirector.request(:instructions)
       when :jukebox then SceneDirector.request(:jukebox)
+      when :sprite_lab then SceneDirector.request(:sprite_lab)
       when :credits then SceneDirector.request(:credits)
       when :quit then $gtk.request_quit
       end
@@ -57,7 +67,7 @@ module Scenes
 
     def item_rects
       MenuRenderer.item_rects(
-        ITEMS.length,
+        items.length,
         screen_w: SCREEN_W,
         top_y: SCREEN_H - ITEMS_TOP_Y,
         item_w: ITEM_W,
@@ -89,7 +99,7 @@ module Scenes
 
     def render_menu_items(outputs)
       MenuRenderer.draw_items(
-        outputs, item_rects, ITEMS.map { |k| LABELS[k] }, @selected
+        outputs, item_rects, items.map { |k| LABELS[k] }, @selected
       )
     end
 
