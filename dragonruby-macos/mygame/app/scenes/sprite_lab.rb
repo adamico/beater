@@ -4,13 +4,12 @@ require 'app/scenes/menu_renderer'
 require 'app/direction'
 require 'app/player'
 require 'app/ghost'
-require 'app/audio/beat_clock'
 
-# Dev-only sprite previewer. Selector + stage layout: pick an entity on the
-# left, a state in the middle, see the live `to_sprite` result on the right.
-# Modifier toggles cycle render-affecting state (enrage step, armor flash,
-# eaten flash) that isn't part of the FSM. See ADR-0016.
 module Scenes
+  # Dev-only sprite previewer. Selector + stage layout: pick an entity on the
+  # left, a state in the middle, see the live `to_sprite` result on the right.
+  # Modifier toggles cycle render-affecting state (enrage step, armor flash,
+  # eaten flash) that isn't part of the FSM. See ADR-0016.
   class SpriteLab
     SCREEN_W = SceneDirector::SCREEN_W
     SCREEN_H = SceneDirector::SCREEN_H
@@ -19,16 +18,15 @@ module Scenes
     ENTITY_LABELS = {
       player: 'PLAYER',
       blinky: 'BLINKY',
-      pinky:  'PINKY',
-      inky:   'INKY',
-      clyde:  'CLYDE'
+      pinky: 'PINKY',
+      inky: 'INKY',
+      clyde: 'CLYDE'
     }.freeze
 
-    PLAYER_STATES = %i[walk dying].freeze
+    PLAYER_STATES = %i[walk dying fire].freeze
     GHOST_STATES  = %i[scatter chase eaten imprisoning imprisoned].freeze
     ENRAGE_STEPS  = %i[off enrage1 enrage2].freeze
 
-    LAB_BPM = 120.0
     CELL = 48
     STAGE_CX = 940
     STAGE_CY = 380
@@ -37,8 +35,6 @@ module Scenes
       @entity_idx = 0
       @state_idx = 0
       @paused = false
-      @beat_mode = true
-      @tick_acc = 0.0
       @enrage_step = :off
       @instances = {}
       @cached_sprite = nil
@@ -85,12 +81,11 @@ module Scenes
       handle_stage_click(args)
 
       @paused = !@paused if kb.space
-      @beat_mode = !@beat_mode if kb.b
       @step_once = true if @paused && kb.period
       trigger_armor_flash if kb.one
       trigger_eaten_flash if kb.two
-      cycle_enrage(-1) if kb.open_bracket
-      cycle_enrage(+1) if kb.close_bracket
+      cycle_enrage(-1) if kb.open_square_brace
+      cycle_enrage(+1) if kb.close_square_brace
       reset_anim! if kb.r
     end
 
@@ -163,7 +158,11 @@ module Scenes
       if inst.is_a?(Player)
         inst.clear_death
         inst.instance_variable_set(:@walk_ticks, 0)
-        inst.begin_death if current_state == :dying
+        inst.instance_variable_set(:@fire_ticks, 0)
+        case current_state
+        when :dying then inst.begin_death
+        when :fire  then inst.begin_fire_anim
+        end
       elsif inst.is_a?(Ghost)
         inst.instance_variable_set(:@armor_flash_ticks, 0)
         inst.instance_variable_set(:@eaten_flash_ticks, 0)
@@ -177,29 +176,32 @@ module Scenes
       sync_instance!
     end
 
+    # Entity owns its own frame cadence (Player::TICKS_PER_WALK_FRAME,
+    # Player::DEATH_ANIM_TICKS, Ghost flash counters). The lab just ticks
+    # once per frame and lets the entity decide what to render.
     def advance_anim
-      step = @beat_mode ? Audio::BeatClock.frames_per_step(bpm: LAB_BPM) : 1.0
-      @tick_acc += 1.0
-      while @tick_acc >= step
-        @tick_acc -= step
-        advance_instance!
-      end
+      advance_instance!
     end
 
     def advance_instance!
       inst = instance_for(current_entity)
-      if inst.is_a?(Player)
-        if current_state == :dying
-          inst.tick_death
-          if inst.death_anim_done?
-            inst.clear_death
-            inst.begin_death
-          end
-        else
-          inst.instance_variable_set(:@walk_ticks,
-                                      inst.instance_variable_get(:@walk_ticks).to_i + 1)
+      return unless inst.is_a?(Player)
+
+      case current_state
+      when :dying
+        inst.tick_death
+        if inst.death_anim_done?
+          inst.clear_death
+          inst.begin_death
         end
+      when :fire
+        inst.tick_fire_anim
+        inst.begin_fire_anim unless inst.firing?
+      else
+        inst.instance_variable_set(:@walk_ticks,
+                                   inst.instance_variable_get(:@walk_ticks).to_i + 1)
       end
+
       # Ghosts: armor / eaten flash counters self-decrement inside to_sprite.
     end
 
@@ -334,7 +336,6 @@ module Scenes
     def render_status(out)
       parts = [
         "enrage=#{@enrage_step}",
-        "beat=#{@beat_mode ? "on @#{LAB_BPM.to_i}bpm" : 'off'}",
         @paused ? 'PAUSED' : 'PLAYING'
       ]
       out.primitives << {
@@ -345,7 +346,7 @@ module Scenes
       }.label!
       out.primitives << {
         x: SCREEN_W / 2, y: 55,
-        text: '←/→ entity   ↑/↓ state   SPACE pause   . step   B beat   1 armor   2 eaten   [/] enrage   R restart   ESC back',
+        text: '←/→ entity   ↑/↓ state   SPACE pause   . step   1 armor   2 eaten   [/] enrage   R restart   ESC back',
         size_enum: 0, alignment_enum: 1,
         r: 140, g: 140, b: 160
       }.label!
