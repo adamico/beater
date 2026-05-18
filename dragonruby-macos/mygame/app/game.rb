@@ -3,6 +3,7 @@ require 'app/grid_projection'
 require 'app/camera'
 require 'app/maze'
 require 'app/pellets'
+require 'app/particles'
 require 'app/direction'
 require 'app/grid_mover'
 require 'app/keyboard_controller'
@@ -104,6 +105,7 @@ class Game
     @play_ticks = 0 # ADR-0013: only advances during tick_playing
     @audio_state_for = nil
     @projectiles = []
+    @particles = Particles.new # ADR-0018
     @track_popups = []      # G1: Game-owned score popups for track completion
     @meter_flash = {}       # G1: color => ticks remaining for HUD meter flash
     apply_level_config
@@ -382,6 +384,7 @@ class Game
     @player.tick_fire_anim
     tick_projectiles
     tick_collisions
+    @particles.tick # ADR-0018
     draw_frame
   end
 
@@ -702,6 +705,7 @@ class Game
       outputs, @maze, @pellets, @player, ghosts,
       camera: @camera,
       projectiles: @projectiles,
+      particles: @particles,
       popup: @eat_sequencer.popup,
       track_popups: @track_popups,
       hud: hud_data,
@@ -789,11 +793,17 @@ class Game
     @release_schedule.on_dot_eaten
     @player.on_dot_eaten
     @score += (kind == :power ? 50 : 10)
+    rect = @projection.cell_rect(gx, gy)
+    burst_x = rect[:x] + rect[:w] / 2.0
+    burst_y = rect[:y] + rect[:h] / 2.0
     if kind == :power
       args.state.audio.on_power_pellet(args)
       @player.gain_ammo
+      @particles.power_burst(world_x: burst_x, world_y: burst_y) # ADR-0018
     else
       args.state.audio.on_dot_collected(args, entry[:color])
+      color_rgb = Hud::PELLET_COLOR_BY_KEY[entry[:color]]
+      @particles.burst(world_x: burst_x, world_y: burst_y, color_rgb: color_rgb) if color_rgb # ADR-0018
     end
 
     on_track_cleared(gx, gy, entry[:track_cleared]) if entry[:track_cleared]

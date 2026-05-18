@@ -15,10 +15,8 @@
 # Polish after MVP
 
 ## Visual
-- improve hit feedback (ghosts, player)
-- ~~add screen shake on player hit~~ (ADR-0017)
 - add particles for:
-  - dot collection
+  - ~~dot collection~~ (ADR-0018)
   - ghost hits
   - player shooting
 - add light effects for player shooting

@@ -33,18 +33,35 @@ class Renderer
     @world_target_built = false
   end
 
-  def draw(outputs, maze, pellets, player, ghosts = [], camera:, projectiles: [], popup: nil, track_popups: [],
-           hud: nil, state: :playing)
+  def draw(outputs, maze, pellets, player, ghosts = [], camera:, projectiles: [], particles: nil,
+           popup: nil, track_popups: [], hud: nil, state: :playing)
     @camera = camera
     outputs.background_color = BACKGROUND
     draw_world(outputs, maze)
     draw_pellets(outputs, pellets)
+    draw_particles(outputs, particles) if particles # ADR-0018 (above actors, below HUD)
     draw_actors(outputs, player, ghosts, projectiles)
     draw_hud(outputs, hud) if hud && state != :game_over
     draw_popup(outputs, popup) if popup
     track_popups.each { |p| draw_popup(outputs, p, color: TRACK_POPUP_COLOR) }
     outputs.labels << Banner.build(state)[:labels]
     state
+  end
+
+  # Render-only confetti (ADR-0018). World-space, camera-transformed via the
+  # same `project()` seam as actors (handles toroidal X seam + screen shake).
+  def draw_particles(outputs, particles)
+    solids = []
+    particles.list.each do |p|
+      half = p[:size] / 2.0
+      alpha = (255.0 * p[:life] / p[:life_total]).to_i
+      solids.concat(project(
+                      x: p[:x] - half, y: p[:y] - half,
+                      w: p[:size], h: p[:size],
+                      r: p[:r], g: p[:g], b: p[:b], a: alpha
+                    ))
+    end
+    outputs.solids << solids
   end
 
   # Hud + Banner modules own all screen-space overlay layout. Renderer just
