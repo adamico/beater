@@ -26,7 +26,7 @@
 - add light effects for player shooting
 - rhythm hint in ghost sprites (pulse, glow)
 - proper level graphics in place of bland white walls
-- 
+
 ## UI
 
 ## Audio

@@ -42,6 +42,7 @@ class Player
     @visual_offset_x = 0.0
     @visual_offset_y = 0.0
     @walk_ticks = 0
+    @fire_ticks = 0
     @ammo = 0
   end
 
@@ -67,6 +68,7 @@ class Player
 
   def begin_death
     @death_ticks = DEATH_ANIM_TICKS
+    @fire_ticks = 0
   end
 
   def tick_death
@@ -88,6 +90,23 @@ class Player
   WALK_FRAME_START = 0
   WALK_FRAME_COUNT = 10
   TICKS_PER_WALK_FRAME = 3
+
+  FIRE_FRAME_START = 10
+  FIRE_FRAME_COUNT = 6
+  TICKS_PER_FIRE_FRAME = 2
+  FIRE_ANIM_TICKS = FIRE_FRAME_COUNT * TICKS_PER_FIRE_FRAME
+
+  def begin_fire_anim
+    @fire_ticks = FIRE_ANIM_TICKS
+  end
+
+  def tick_fire_anim
+    @fire_ticks -= 1 if @fire_ticks && @fire_ticks > 0
+  end
+
+  def firing?
+    !@fire_ticks.nil? && @fire_ticks > 0
+  end
 
   # Px per tick the rendered sprite catches up to the logical position
   # after a corner snap. Lower = more visible diagonal slide; higher = closer
@@ -216,8 +235,14 @@ class Player
   def to_sprite
     return death_sprite if dying?
 
-    frame = @walk_ticks.idiv(TICKS_PER_WALK_FRAME) % WALK_FRAME_COUNT
-    tile_index = WALK_FRAME_START + frame
+    if firing?
+      elapsed = FIRE_ANIM_TICKS - @fire_ticks
+      frame = (elapsed.idiv(TICKS_PER_FIRE_FRAME)).clamp(0, FIRE_FRAME_COUNT - 1)
+      tile_index = FIRE_FRAME_START + frame
+    else
+      frame = @walk_ticks.idiv(TICKS_PER_WALK_FRAME) % WALK_FRAME_COUNT
+      tile_index = WALK_FRAME_START + frame
+    end
     base = {
       x: @x + @sprite_offset_x + @visual_offset_x,
       y: @y + @sprite_offset_y + @visual_offset_y,

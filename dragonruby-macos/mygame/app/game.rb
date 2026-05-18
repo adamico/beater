@@ -379,6 +379,7 @@ class Game
     end
     tick_ghosts(world)
     tick_fire_input(world)
+    @player.tick_fire_anim
     tick_projectiles
     tick_collisions
     draw_frame
@@ -855,6 +856,7 @@ class Game
     return unless @player.consume_ammo!
 
     Audio::SFXPlayer.play(args, :shoot)
+    @player.begin_fire_anim
     fire_projectile
   end
 
