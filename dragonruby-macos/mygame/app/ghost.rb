@@ -2,6 +2,7 @@ require 'app/direction'
 require 'app/grid_mover'
 require 'app/tiles'
 require 'app/ghost_controllers'
+require 'app/audio/beat_clock'
 
 GHOST_DEBUG_LOGS = false
 
@@ -114,6 +115,29 @@ class Ghost
 
   STUCK_LOG_THRESHOLD = 120 # 2s @ 60fps
 
+  # Bob: beat-locked vertical sine y-offset, render-only. Phase derived from
+  # tick_count (pause-coherent, like Beat pulse). Per-identity offset so the
+  # four ghosts bob out-of-phase rather than as a single block. Suppressed
+  # in :eaten / :imprisoned states and during the eaten-flash anim.
+  BOB_AMPLITUDE_PX = 4.0
+  BOB_BPM = 128.0
+  BOB_PHASE_OFFSETS = {
+    blinky: 0.0,
+    pinky: 0.25,
+    inky: 0.5,
+    clyde: 0.75
+  }.freeze
+  BOB_SUPPRESSED_STATES = %i[eaten imprisoned imprisoning].freeze
+
+  def bob_offset_y
+    return 0.0 if flashing? || BOB_SUPPRESSED_STATES.include?(@state)
+
+    frames_per_beat = Audio::BeatClock.frames_per_step(bpm: BOB_BPM) * Audio::BeatClock::STEPS_PER_BEAT
+    phase = Kernel.tick_count.to_f / frames_per_beat
+    offset = BOB_PHASE_OFFSETS[@identity] || 0.0
+    Math.sin((phase + offset) * 2 * Math::PI) * BOB_AMPLITUDE_PX
+  end
+
   attr_reader :enrage_step, :absorbed_hits, :armor_flash_ticks, :state, :identity, :scatter_target, :spawn_cell,
               :base_speed
 
@@ -134,6 +158,7 @@ class Ghost
   def to_sprite
     sheet = SHEETS[@identity]
     sprite = sheet ? sheet_sprite(sheet) : legacy_sprite
+    sprite[:y] += bob_offset_y
     sprite.merge!(a: 110, r: 160, g: 160, b: 160) if @state == :imprisoned
     sprite
   end

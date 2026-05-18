@@ -327,7 +327,10 @@ module Scenes
         inst = instance_for(current_entity)
         sprite = inst.to_sprite.dup
         sprite[:x] = STAGE_CX - sprite[:w] / 2.0
-        sprite[:y] = STAGE_CY - sprite[:h] / 2.0
+        # Recentre on the stage but preserve any render-time y-offset the
+        # entity applied (e.g. Ghost#bob_offset_y).
+        bob = inst.respond_to?(:bob_offset_y) ? inst.bob_offset_y : 0.0
+        sprite[:y] = STAGE_CY - sprite[:h] / 2.0 + bob
         @cached_sprite = sprite
       end
       @cached_sprite
