@@ -40,6 +40,28 @@ Replace `.dragonruby/stubs/html5/` with the equivalent files from a
 Standard tier 6.58 stub set. Audio returns immediately, no source
 changes required. (Loses C-extension capability in HTML5 publish.)
 
+## Stub manifest difference
+Standard 6.58 stubs ship:
+  dragonruby-wasm.wasm, dragonruby-wasm.js, dragonruby-wasm.worker.js,
+  dragonruby-serviceworker.js, dragonruby-html5-loader.js
+
+Indie 7.2 stubs ship: same set minus `dragonruby-wasm.worker.js`.
+
+Hybrid attempts (.dragonruby/stubs/html5/stub/):
+- Indie wasm.wasm + Indie wasm.js + Standard worker.js → still silent
+- Indie wasm.wasm + Standard wasm.js + Standard worker.js →
+  `LinkError: Import "_emscripten_thread_cleanup": function import
+  requires a callable` (Indie wasm imports threading symbols Standard
+  glue doesn't provide; confirms Indie wasm uses pthreads)
+- Standard wasm.wasm + Indie wasm.js →
+  `LinkError: Import "abort": function import requires a callable`
+  (tier-locked ABI)
+
+Reading: Indie wasm.wasm is built with pthread / SharedArrayBuffer, but
+the Indie zip ships no worker.js shim, and the Indie wasm.js + main-
+thread setup doesn't initialize the audio output for that pthread
+config. Possibly the audio sink relies on a worker that never starts.
+
 ## Sample-only repro (no beater code involved)
 ```sh
 cp dragonruby-macos/mygame/metadata/icon.png \
