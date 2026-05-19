@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rtk ls *)",
+      "Read(//Users/kc00l/Downloads/dragonruby-macos/.dragonruby/stubs/html5/stub/**)",
+      "Bash(find ~/Downloads/dragonruby-macos/.dragonruby/stubs/html5 -type f | head -20)",
+      "Read(//Users/kc00l/Downloads/dragonruby-macos/.dragonruby/stubs/html5/**)",
+      "Bash(md5 /Users/kc00l/beater/dragonruby-macos/.dragonruby/stubs/html5/stub/dragonruby-wasm.js ~/Downloads/dragonruby-macos/.dragonruby/stubs/html5/stub/dragonruby-wasm.js)",
+      "Bash(cd ~/Downloads/dragonruby-macos && rtk ls samples/07_advanced_audio/01_audio_mixer/ && rtk ls dragonruby-publish 2>&1 | head -2)",
+      "Read(//Users/kc00l/Downloads/dragonruby-macos/**)",
+      "Bash(./dragonruby-publish --only-package samples/07_advanced_audio/01_audio_mixer/)",
+      "Bash(python3 -m http.server 8002)"
+    ]
+  }
+}
