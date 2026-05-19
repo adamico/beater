@@ -64,8 +64,10 @@ typedef uint64_t Uint64;
 typedef struct _SDL_iconv_t *SDL_iconv_t;
 typedef struct SDL_Thread SDL_Thread;
 typedef int (*SDL_ThreadFunction) (void *data);
-typedef struct { int value; } SDL_atomic_t;
-typedef unsigned long SDL_threadID;
+typedef struct { int value; } SDL_AtomicInt;
+typedef SDL_AtomicInt SDL_atomic_t;
+typedef Uint64 SDL_ThreadID;
+typedef Uint64 SDL_threadID;
 #endif
 
 // PhysicsFS defines these, this is just here if physfs.h wasn't included.
@@ -139,6 +141,13 @@ typedef struct PHYSFS_Stat
 #undef mrb_bool
 #undef mrb_float
 
+// SDL_CreateThread is a function-like macro in SDL3 (wraps SDL_CreateThreadRuntime for Windows
+// C runtime compatibility). Undef it before the struct so that the drb_api_t field name and
+// ffi.c's LOOKUP/assignment can reference the real polyfill function defined below.
+#ifdef SDL_stdinc_h_
+#undef SDL_CreateThread
+#endif
+
 typedef struct drb_api_t {
 #define DRB_FFI_EXPOSE(type, name) type;
 #include <dragonruby.h.inc>
@@ -149,5 +158,20 @@ typedef struct drb_api_t {
 #define mrb_int(mrb, val) mrb_integer(mrb_to_int(mrb, val))
 #define mrb_bool(o) (((o).w & ~(uintptr_t)MRB_Qfalse) != 0)
 #define mrb_float(o) mrb_val_union(o).fp->f
+
+// SDL backward-compatibility polyfills for names introduced in .inc that don't exist as real SDL3 symbols.
+// Guarded so extension code without SDL headers compiles cleanly; the DR binary (which includes SDL) provides
+// the actual symbols that get registered in drb_api_t.
+#ifdef SDL_stdinc_h_
+
+static inline SDL_Thread *SDL_CreateThread(SDL_ThreadFunction fn, const char *name, void *data) {
+  return SDL_CreateThreadRuntime(fn, name, data, (SDL_FunctionPointer)(SDL_BeginThreadFunction), (SDL_FunctionPointer)(SDL_EndThreadFunction));
+}
+
+static inline int SDL_setenv(const char *name, const char *value, int overwrite) { return SDL_setenv_unsafe(name, value, overwrite); }
+static inline char *SDL_strtokr(char *s1, const char *s2, char **saveptr) { return SDL_strtok_r(s1, s2, saveptr); }
+static inline int SDL_AtomicSet(SDL_AtomicInt *a, int v) { return SDL_SetAtomicInt(a, v); }
+static inline int SDL_AtomicGet(SDL_AtomicInt *a) { return SDL_GetAtomicInt(a); }
+#endif
 
 #endif // DRAGONRUBY_DRAGONRUBY_H
